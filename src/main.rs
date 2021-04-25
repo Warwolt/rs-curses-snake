@@ -15,9 +15,6 @@ fn main() {
             }
             i += 1;
 
-            // Why does this not behave AT ALL like the reference C++ program?
-            // Does the ref program differ in version of PDCurses? Is the
-            // bindings we're using just broken somehow?
             pdcurses::werase(window);
             pdcurses::resize_term(0, 0);
             pdcurses::curs_set(0);

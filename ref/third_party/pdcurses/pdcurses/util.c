@@ -1,6 +1,7 @@
 /* PDCurses */
 
 #include <curspriv.h>
+#include <assert.h>
 
 /*man-start**************************************************************
 
@@ -75,8 +76,13 @@ util
 
 **man-end****************************************************************/
 
-#include <stdlib.h>
-#include <string.h>
+#ifdef PDC_WIDE
+# ifdef PDC_FORCE_UTF8
+#  include <string.h>
+# else
+#  include <stdlib.h>
+# endif
+#endif
 
 char *unctrl(chtype c)
 {
@@ -112,6 +118,7 @@ void filter(void)
 
 void use_env(bool x)
 {
+    INTENTIONALLY_UNUSED_PARAMETER( x);
     PDC_LOG(("use_env() - called: x %d\n", x));
 }
 
@@ -122,21 +129,59 @@ int delay_output(int ms)
     return napms(ms);
 }
 
+int PDC_wc_to_utf8( char *dest, const int32_t code)
+{
+   int n_bytes_out;
+
+   if (code < 0x80)
+   {
+       dest[0] = (char)code;
+       n_bytes_out = 1;
+   }
+   else
+       if (code < 0x800)
+       {
+           dest[0] = (char) (((code >> 6) & 0x1f) | 0xc0);
+           dest[1] = (char) ((code & 0x3f) | 0x80);
+           n_bytes_out = 2;
+       }
+       else if( code < 0x10000)
+       {
+           dest[0] = (char) (((code >> 12) & 0x0f) | 0xe0);
+           dest[1] = (char) (((code >> 6) & 0x3f) | 0x80);
+           dest[2] = (char) ((code & 0x3f) | 0x80);
+           n_bytes_out = 3;
+       }
+       else       /* Unicode past 64K,  i.e.,  SMP */
+       {
+           dest[0] = (char) (((code >> 18) & 0x0f) | 0xf0);
+           dest[1] = (char) (((code >> 12) & 0x3f) | 0x80);
+           dest[2] = (char) (((code >> 6) & 0x3f) | 0x80);
+           dest[3] = (char) ((code & 0x3f) | 0x80);
+           n_bytes_out = 4;
+       }
+   return( n_bytes_out);
+}
+
 #ifdef PDC_WIDE
 int getcchar(const cchar_t *wcval, wchar_t *wch, attr_t *attrs,
              short *color_pair, void *opts)
 {
+    INTENTIONALLY_UNUSED_PARAMETER( opts);
+    assert( wcval);
     if (!wcval)
         return ERR;
 
     if (wch)
     {
+        assert( attrs);
+        assert( color_pair);
         if (!attrs || !color_pair)
             return ERR;
 
-        *wch = (*wcval & A_CHARTEXT);
+        *wch = (wchar_t)(*wcval & A_CHARTEXT);
         *attrs = (*wcval & (A_ATTRIBUTES & ~A_COLOR));
-        *color_pair = PAIR_NUMBER(*wcval & A_COLOR);
+        *color_pair = (short)( PAIR_NUMBER(*wcval & A_COLOR));
 
         if (*wch)
             *++wch = L'\0';
@@ -150,6 +195,9 @@ int getcchar(const cchar_t *wcval, wchar_t *wch, attr_t *attrs,
 int setcchar(cchar_t *wcval, const wchar_t *wch, const attr_t attrs,
              short color_pair, const void *opts)
 {
+    INTENTIONALLY_UNUSED_PARAMETER( opts);
+    assert( wcval);
+    assert( wch);
     if (!wcval || !wch)
         return ERR;
 
@@ -166,6 +214,7 @@ wchar_t *wunctrl(cchar_t *wc)
 
     PDC_LOG(("wunctrl() - called\n"));
 
+    assert( wc);
     if (!wc)
         return NULL;
 
@@ -188,13 +237,17 @@ wchar_t *wunctrl(cchar_t *wc)
     return strbuf;
 }
 
+#define IS_CONTINUATION_BYTE( c) (((c) & 0xc0) == 0x80)
+
 int PDC_mbtowc(wchar_t *pwc, const char *s, size_t n)
 {
 # ifdef PDC_FORCE_UTF8
-    wchar_t key;
+    uint32_t key;
     int i = -1;
     const unsigned char *string;
 
+    assert( s);
+    assert( pwc);
     if (!s || (n < 1))
         return -1;
 
@@ -205,36 +258,41 @@ int PDC_mbtowc(wchar_t *pwc, const char *s, size_t n)
 
     key = string[0];
 
-    /* Simplistic UTF-8 decoder -- only does the BMP, minimal validation */
+    /* Simplistic UTF-8 decoder -- a little validation */
 
-    if (key & 0x80)
+    if ((key & 0xc0) == 0xc0 && IS_CONTINUATION_BYTE( string[1]))
     {
-        if ((key & 0xe0) == 0xc0)
+        if ((key & 0xe0) == 0xc0 && 1 < n)
         {
-            if (1 < n)
-            {
-                key = ((key & 0x1f) << 6) | (string[1] & 0x3f);
-                i = 2;
-            }
+            key = ((key & 0x1f) << 6) | (string[1] & 0x3f);
+            i = 2;      /* two-byte sequence : U+0080 to U+07FF */
         }
-        else if ((key & 0xe0) == 0xe0)
+        else if ((key & 0xf0) == 0xe0 && 2 < n
+                  && IS_CONTINUATION_BYTE( string[2]))
         {
-            if (2 < n)
-            {
-                key = ((key & 0x0f) << 12) | ((string[1] & 0x3f) << 6) |
-                      (string[2] & 0x3f);
-                i = 3;
-            }
+            key = ((key & 0x0f) << 12) | ((string[1] & 0x3f) << 6) |
+                  (string[2] & 0x3f);
+            i = 3;      /* three-byte sequence : U+0800 to U+FFFF */
+        }
+        else if ((key & 0xf8) == 0xf0 && 3 < n    /* SMP:  Unicode past 64K */
+                  && IS_CONTINUATION_BYTE( string[2])
+                  && IS_CONTINUATION_BYTE( string[3]))
+        {
+            key = ((key & 0x07) << 18) | ((string[1] & 0x3f) << 12) |
+                  ((string[2] & 0x3f) << 6) | (string[2] & 0x3f);
+            if( key <= 0x10ffff)
+                i = 4;     /* four-byte sequence : U+10000 to U+10FFFF */
         }
     }
-    else
+    else             /* 'ordinary' 7-bit ASCII */
         i = 1;
 
-    if (i)
-        *pwc = key;
+    *pwc = (wchar_t)key;
 
     return i;
 # else
+    assert( s);
+    assert( pwc);
     return mbtowc(pwc, s, n);
 # endif
 }
@@ -244,6 +302,8 @@ size_t PDC_mbstowcs(wchar_t *dest, const char *src, size_t n)
 # ifdef PDC_FORCE_UTF8
     size_t i = 0, len;
 
+    assert( src);
+    assert( dest);
     if (!src || !dest)
         return 0;
 
@@ -254,7 +314,7 @@ size_t PDC_mbstowcs(wchar_t *dest, const char *src, size_t n)
         int retval = PDC_mbtowc(dest + i, src, len);
 
         if (retval < 1)
-            return -1;
+            return (size_t)-1;
 
         src += retval;
         len -= retval;
@@ -272,33 +332,13 @@ size_t PDC_wcstombs(char *dest, const wchar_t *src, size_t n)
 # ifdef PDC_FORCE_UTF8
     size_t i = 0;
 
+    assert( src);
+    assert( dest);
     if (!src || !dest)
         return 0;
 
     while (*src && i < n)
-    {
-        chtype code = *src++;
-
-        if (code < 0x80)
-        {
-            dest[i] = code;
-            i++;
-        }
-        else
-            if (code < 0x800)
-            {
-                dest[i] = ((code & 0x07c0) >> 6) | 0xc0;
-                dest[i + 1] = (code & 0x003f) | 0x80;
-                i += 2;
-            }
-            else
-            {
-                dest[i] = ((code & 0xf000) >> 12) | 0xe0;
-                dest[i + 1] = ((code & 0x0fc0) >> 6) | 0x80;
-                dest[i + 2] = (code & 0x003f) | 0x80;
-                i += 3;
-            }
-    }
+       i += PDC_wc_to_utf8( dest + i, *src++);
 # else
     size_t i = wcstombs(dest, src, n);
 # endif

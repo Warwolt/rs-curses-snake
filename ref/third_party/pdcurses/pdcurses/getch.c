@@ -1,6 +1,7 @@
 /* PDCurses */
 
 #include <curspriv.h>
+#include <assert.h>
 
 /*man-start**************************************************************
 
@@ -117,12 +118,12 @@ static int _get_box(int *y_start, int *y_end, int *x_start, int *x_end)
     return (end - start) + (*y_end - *y_start);
 }
 
-static void _highlight(void)
+static bool _highlight(void)
 {
     int i, j, y_start, y_end, x_start, x_end;
 
-    if (-1 == SP->sel_start)
-        return;
+    if (-1 == SP->sel_start || SP->sel_start == SP->sel_end)
+        return( FALSE);
 
     _get_box(&y_start, &y_end, &x_start, &x_end);
 
@@ -130,8 +131,7 @@ static void _highlight(void)
         for (i = (j == y_start ? x_start : 0);
              i < (j == y_end ? x_end : COLS); i++)
             curscr->_y[j][i] ^= A_REVERSE;
-
-    wrefresh(curscr);
+    return( TRUE);
 }
 
 static void _copy(void)
@@ -166,7 +166,11 @@ static void _copy(void)
     {
         for (i = (j == y_start ? x_start : 0);
              i < (j == y_end ? x_end : COLS); i++)
-            TMP[pos++] = curscr->_y[j][i] & MASK;
+#ifdef PDC_WIDE
+            wtmp[pos++] = (wchar_t)( curscr->_y[j][i] & MASK);
+#else
+            tmp[pos++] = (char)( curscr->_y[j][i] & MASK);
+#endif
 
         while (y_start != y_end && pos > 0 && TMP[pos - 1] == 32)
             pos--;
@@ -177,7 +181,7 @@ static void _copy(void)
     TMP[pos] = 0;
 
 #ifdef PDC_WIDE
-    pos = PDC_wcstombs(tmp, wtmp, len);
+    pos = (long)PDC_wcstombs(tmp, wtmp, len);
 #endif
 
     PDC_setclipboard(tmp, pos);
@@ -205,7 +209,7 @@ static int _paste(void)
 
 #ifdef PDC_WIDE
     wpaste = malloc(len * sizeof(wchar_t));
-    len = PDC_mbstowcs(wpaste, paste, len);
+    len = (long)PDC_mbstowcs(wpaste, paste, len);
 #endif
     newmax = len + SP->c_ungind;
     if (newmax > SP->c_ungmax)
@@ -230,30 +234,38 @@ static int _paste(void)
 static int _mouse_key(void)
 {
     int i, key = KEY_MOUSE, changes = SP->mouse_status.changes;
-    unsigned long mbe = SP->_trap_mbe;
+    const unsigned long mbe = SP->_trap_mbe;
+    bool can_select = !(mbe & (BUTTON1_MOVED | BUTTON1_PRESSED | BUTTON1_RELEASED));
+    bool can_paste = !(mbe & BUTTON2_CLICKED);
+            /* really means 'can do these things without shift' */
 
     /* Selection highlighting? */
 
-    if ((!mbe || SP->mouse_status.button[0] & BUTTON_SHIFT) && changes & 1)
+    if ((can_select || SP->mouse_status.button[0] & BUTTON_SHIFT) && changes & 1)
     {
         i = SP->mouse_status.y * COLS + SP->mouse_status.x;
         switch (SP->mouse_status.button[0] & BUTTON_ACTION_MASK)
         {
         case BUTTON_PRESSED:
-            _highlight();
+            if( _highlight())
+                wrefresh(curscr);
             SP->sel_start = SP->sel_end = i;
             return -1;
         case BUTTON_MOVED:
-            _highlight();
+            {
+            const bool refresh_needed = _highlight();
+
             SP->sel_end = i;
-            _highlight();
+            if( _highlight() || refresh_needed)
+                wrefresh(curscr);
             return -1;
+            }
         case BUTTON_RELEASED:
             _copy();
             return -1;
         }
     }
-    else if ((!mbe || SP->mouse_status.button[1] & BUTTON_SHIFT) &&
+    else if ((can_paste || SP->mouse_status.button[1] & BUTTON_SHIFT) &&
              changes & 2 && (SP->mouse_status.button[1] &
              BUTTON_ACTION_MASK) == BUTTON_CLICKED)
     {
@@ -279,6 +291,9 @@ static int _mouse_key(void)
                 || (!(mbe & (BUTTON1_DOUBLE_CLICKED << shf)) &&
                     (button == BUTTON_DOUBLE_CLICKED))
 
+                || (!(mbe & (BUTTON1_TRIPLE_CLICKED << shf)) &&
+                    (button == BUTTON_TRIPLE_CLICKED))
+
                 || (!(mbe & (BUTTON1_MOVED << shf)) &&
                     (button == BUTTON_MOVED))
 
@@ -291,7 +306,7 @@ static int _mouse_key(void)
 
     if (changes & PDC_MOUSE_MOVED)
     {
-        if (!(mbe & (BUTTON1_MOVED|BUTTON2_MOVED|BUTTON3_MOVED)))
+        if (!(mbe & (BUTTON1_MOVED|BUTTON2_MOVED|BUTTON3_MOVED | REPORT_MOUSE_POSITION)))
             SP->mouse_status.changes ^= PDC_MOUSE_MOVED;
     }
 
@@ -320,31 +335,25 @@ static int _mouse_key(void)
     return key;
 }
 
+#define WAIT_FOREVER    -1
+
 int wgetch(WINDOW *win)
 {
-    int key, waitcount;
+    int key, remaining_millisecs;
 
     PDC_LOG(("wgetch() - called\n"));
 
+    assert( SP);
+    assert( win);
     if (!win || !SP)
         return ERR;
 
-    waitcount = 0;
-
-    /* set the number of 1/20th second napms() calls */
-
     if (SP->delaytenths)
-        waitcount = 2 * SP->delaytenths;
+        remaining_millisecs = 100 * SP->delaytenths;
     else
-        if (win->_delayms)
-        {
-            /* Can't really do millisecond intervals, so delay in
-               1/20ths of a second (50ms) */
-
-            waitcount = win->_delayms / 50;
-            if (!waitcount)
-                waitcount = 1;
-        }
+        remaining_millisecs = win->_delayms;
+    if( !remaining_millisecs && !win->_nodelay)
+        remaining_millisecs = WAIT_FOREVER;
 
     /* refresh window when wgetch is called if there have been changes
        to it and it is not a pad */
@@ -375,23 +384,20 @@ int wgetch(WINDOW *win)
     {
         /* is there a keystroke ready? */
 
-        if (!PDC_check_key())
+        while( !PDC_check_key())
         {
             /* if not, handle timeout() and halfdelay() */
+            int nap_time = 50;
 
-            if (SP->delaytenths || win->_delayms)
+            if (remaining_millisecs != WAIT_FOREVER)
             {
-                if (!waitcount)
+                if (!remaining_millisecs)
                     return ERR;
-
-                waitcount--;
+                if( nap_time > remaining_millisecs)
+                    nap_time = remaining_millisecs;
+                remaining_millisecs -= nap_time;
             }
-            else
-                if (win->_nodelay)
-                    return ERR;
-
-            napms(50);  /* sleep for 1/20th second */
-            continue;   /* then check again */
+            napms( nap_time);
         }
 
         /* if there is, fetch it */
@@ -400,7 +406,9 @@ int wgetch(WINDOW *win)
 
         /* copy or paste? */
 
+#ifndef _WIN32
         if (SP->key_modifiers & PDC_KEY_MODIFIER_SHIFT)
+#endif
         {
             if (0x03 == key)
             {
@@ -427,7 +435,8 @@ int wgetch(WINDOW *win)
         if (key == -1)
             continue;
 
-        _highlight();
+        if( _highlight())
+            wrefresh(curscr);
         SP->sel_start = SP->sel_end = -1;
 
         /* translate CR */
@@ -502,6 +511,7 @@ int flushinp(void)
 {
     PDC_LOG(("flushinp() - called\n"));
 
+    assert( SP);
     if (!SP)
         return ERR;
 
@@ -518,8 +528,9 @@ unsigned long PDC_get_key_modifiers(void)
 {
     PDC_LOG(("PDC_get_key_modifiers() - called\n"));
 
+    assert( SP);
     if (!SP)
-        return ERR;
+        return (unsigned long)ERR;
 
     return SP->key_modifiers;
 }
@@ -528,6 +539,7 @@ int PDC_return_key_modifiers(bool flag)
 {
     PDC_LOG(("PDC_return_key_modifiers() - called\n"));
 
+    assert( SP);
     if (!SP)
         return ERR;
 
@@ -542,6 +554,7 @@ int wget_wch(WINDOW *win, wint_t *wch)
 
     PDC_LOG(("wget_wch() - called\n"));
 
+    assert( wch);
     if (!wch)
         return ERR;
 
@@ -550,7 +563,7 @@ int wget_wch(WINDOW *win, wint_t *wch)
     if (key == ERR)
         return ERR;
 
-    *wch = key;
+    *wch = (wint_t)key;
 
     return SP->key_code ? KEY_CODE_YES : OK;
 }

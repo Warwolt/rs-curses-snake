@@ -4,12 +4,15 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #ifdef PDC_WIDE
-# include "../common/acsuni.h"
+   #define USE_UNICODE_ACS_CHARS 1
 #else
-# include "../common/acs437.h"
+   #define USE_UNICODE_ACS_CHARS 0
 #endif
+
+#include "../common/acs_defs.h"
 
 DWORD pdc_last_blink;
 static bool blinked_off = FALSE;
@@ -30,7 +33,7 @@ void PDC_gotoyx(int row, int col)
     SetConsoleCursorPosition(pdc_con_out, coord);
 }
 
-void _set_ansi_color(short f, short b, attr_t attr)
+static void _set_ansi_color(short f, short b, attr_t attr)
 {
     char esc[64], *p;
     short tmp, underline;
@@ -129,18 +132,34 @@ void _set_ansi_color(short f, short b, attr_t attr)
         if (!pdc_conemu)
             SetConsoleMode(pdc_con_out, 0x0015);
 
-        WriteConsoleA(pdc_con_out, esc, strlen(esc), NULL, NULL);
+        WriteConsoleA(pdc_con_out, esc, (DWORD)strlen(esc), NULL, NULL);
 
         if (!pdc_conemu)
             SetConsoleMode(pdc_con_out, 0x0010);
     }
 }
 
-void _new_packet(attr_t attr, int lineno, int x, int len, const chtype *srcp)
+#ifdef PDC_WIDE
+const chtype MAX_UNICODE = 0x10ffff;
+const chtype DUMMY_CHAR_NEXT_TO_FULLWIDTH = 0x110000;
+#endif
+
+#define MAX_PACKET_SIZE 128
+
+static void _new_packet(attr_t attr, int lineno, int x, int len, const chtype *srcp)
 {
     int j;
-    short fore, back;
+    int fore, back;
     bool blink, ansi;
+
+    assert( len >= 0);
+    while( len > MAX_PACKET_SIZE)
+    {
+        _new_packet( attr, lineno, x, MAX_PACKET_SIZE, srcp);
+        srcp += MAX_PACKET_SIZE;
+        x += MAX_PACKET_SIZE;
+        len -= MAX_PACKET_SIZE;
+    }
 
     if (pdc_ansi && (lineno == (SP->lines - 1)) && ((x + len) == SP->cols))
     {
@@ -153,7 +172,7 @@ void _new_packet(attr_t attr, int lineno, int x, int len, const chtype *srcp)
         return;
     }
 
-    pair_content(PAIR_NUMBER(attr), &fore, &back);
+    extended_pair_content(PAIR_NUMBER(attr), &fore, &back);
     ansi = pdc_ansi || (fore >= 16 || back >= 16);
     blink = (SP->termattrs & A_BLINK) && (attr & A_BLINK);
 
@@ -172,11 +191,13 @@ void _new_packet(attr_t attr, int lineno, int x, int len, const chtype *srcp)
     if (ansi)
     {
 #ifdef PDC_WIDE
-        WCHAR buffer[512];
+        WCHAR buffer[MAX_PACKET_SIZE];
 #else
-        char buffer[512];
+        char buffer[MAX_PACKET_SIZE];
 #endif
-        for (j = 0; j < len; j++)
+        int n_out;
+
+        for (j = n_out = 0; j < len; j++)
         {
             chtype ch = srcp[j];
 
@@ -186,23 +207,27 @@ void _new_packet(attr_t attr, int lineno, int x, int len, const chtype *srcp)
             if (blink && blinked_off)
                 ch = ' ';
 
-            buffer[j] = ch & A_CHARTEXT;
+#ifdef PDC_WIDE
+            if( (ch & A_CHARTEXT) != DUMMY_CHAR_NEXT_TO_FULLWIDTH)
+#endif
+                buffer[n_out++] = (WCHAR)( ch & A_CHARTEXT);
         }
 
         PDC_gotoyx(lineno, x);
         _set_ansi_color(fore, back, attr);
 #ifdef PDC_WIDE
-        WriteConsoleW(pdc_con_out, buffer, len, NULL, NULL);
+        WriteConsoleW(pdc_con_out, buffer, n_out, NULL, NULL);
 #else
-        WriteConsoleA(pdc_con_out, buffer, len, NULL, NULL);
+        WriteConsoleA(pdc_con_out, buffer, n_out, NULL, NULL);
 #endif
     }
     else
     {
-        CHAR_INFO buffer[512];
+        CHAR_INFO buffer[MAX_PACKET_SIZE];
         COORD bufSize, bufPos;
         SMALL_RECT sr;
         WORD mapped_attr;
+        int n_out = 0;
 
         fore = pdc_curstoreal[fore];
         back = pdc_curstoreal[back];
@@ -219,7 +244,7 @@ void _new_packet(attr_t attr, int lineno, int x, int len, const chtype *srcp)
         if (attr & A_RIGHT)
             mapped_attr |= 0x1000; /* COMMON_LVB_GRID_RVERTICAL */
 
-        for (j = 0; j < len; j++)
+        for (j = n_out = 0; j < len; j++)
         {
             chtype ch = srcp[j];
 
@@ -229,12 +254,15 @@ void _new_packet(attr_t attr, int lineno, int x, int len, const chtype *srcp)
             if (blink && blinked_off)
                 ch = ' ';
 
-            buffer[j].Attributes = mapped_attr;
-            buffer[j].Char.UnicodeChar = ch & A_CHARTEXT;
+            buffer[n_out].Attributes = mapped_attr;
+#ifdef PDC_WIDE
+            if( (ch & A_CHARTEXT) != DUMMY_CHAR_NEXT_TO_FULLWIDTH)
+#endif
+               buffer[n_out++].Char.UnicodeChar = (WCHAR)( ch & A_CHARTEXT);
         }
 
         bufPos.X = bufPos.Y = 0;
-        bufSize.X = len;
+        bufSize.X = n_out;
         bufSize.Y = 1;
 
         sr.Top = sr.Bottom = lineno;

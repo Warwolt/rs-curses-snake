@@ -23,8 +23,7 @@ checksum = "9385f66bf6105b241aa65a61cb923ef20efc665cb9f9bb50ac2f0c4b7f378d41"
 [[package]]
 name = "pdcurses-sys"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "084dd22796ff60f1225d4eb6329f33afaf4c85419d51d440ab6b8c6f4529166b"
+source = "git+https://github.com/warwolt/pdcurses-sys-wmcbrine?branch=main#ce385c4e87b984632eb9341f4969d6132f9f6534"
 dependencies = [
  "cc",
  "libc",

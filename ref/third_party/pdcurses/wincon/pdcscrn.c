@@ -14,6 +14,9 @@ HANDLE pdc_con_in = INVALID_HANDLE_VALUE;
 
 DWORD pdc_quick_edit;
 
+/* special purpose function keys */
+static int PDC_shutdown_key[PDC_MAX_FUNCTION_KEYS] = { 0, 0, 0, 0, 0 };
+
 static short realtocurs[16] =
 {
     COLOR_BLACK, COLOR_BLUE, COLOR_GREEN, COLOR_CYAN, COLOR_RED,
@@ -104,7 +107,15 @@ static LPTOP_LEVEL_EXCEPTION_FILTER xcpt_filter;
 
 static DWORD old_console_mode = 0;
 
-static bool is_nt;
+/* MSVC++ 7.1 was the last version to support Win95/98/ME.  If we're
+on any MSVC after that (_MSC_VER > 1310),  is_nt is going to be true
+no matter what.  */
+
+#if defined(_MSC_VER) && _MSC_VER > 1310
+   const bool is_nt = TRUE;
+#else
+   static bool is_nt;
+#endif
 
 static void _reset_old_colors(void)
 {
@@ -399,7 +410,9 @@ int PDC_scr_open(void)
         exit(1);
     }
 
+#if !defined(_MSC_VER) || _MSC_VER <= 1310
     is_nt = !(GetVersion() & 0x80000000);
+#endif
 
     str = getenv("ConEmuANSI");
     pdc_conemu = !!str;
@@ -515,8 +528,12 @@ int PDC_resize_screen(int nlines, int ncols)
 {
     SMALL_RECT rect;
     COORD size, max;
+    const bool prog_resize = nlines || ncols;
 
-    bool prog_resize = nlines || ncols;
+    if( !stdscr)     /* We're trying to specify an initial screen size */
+    {                /* before calling initscr().  This works on some  */
+        return OK;   /* some platforms,  but not on this one (yet).    */
+    }
 
     if (!prog_resize)
     {
@@ -616,7 +633,7 @@ bool PDC_can_change_color(void)
     return is_nt;
 }
 
-int PDC_color_content(short color, short *red, short *green, short *blue)
+int PDC_color_content(int color, int *red, int *green, int *blue)
 {
     if (color < 16 && !pdc_conemu)
     {
@@ -649,7 +666,7 @@ int PDC_color_content(short color, short *red, short *green, short *blue)
     return OK;
 }
 
-int PDC_init_color(short color, short red, short green, short blue)
+int PDC_init_color(int color, int red, int green, int blue)
 {
     if (red == -1 && green == -1 && blue == -1)
     {
@@ -682,4 +699,25 @@ int PDC_init_color(short color, short red, short green, short blue)
     }
 
     return OK;
+}
+
+/* Does nothing in the Win32 flavor of PDCurses.  Included solely because
+without this,  we get an unresolved external... */
+
+void PDC_set_resize_limits( const int new_min_lines, const int new_max_lines,
+                  const int new_min_cols, const int new_max_cols)
+{
+}
+
+/* PDC_set_function_key() does nothing on this platform */
+int PDC_set_function_key( const unsigned function, const int new_key)
+{
+    int old_key = -1;
+
+    if( function < PDC_MAX_FUNCTION_KEYS)
+    {
+         old_key = PDC_shutdown_key[function];
+         PDC_shutdown_key[function] = new_key;
+    }
+    return( old_key);
 }

@@ -1,7 +1,7 @@
 # Visual C++ Makefile for PDCurses - Windows console
 #
 # Usage: nmake -f [path\]Makefile.vc [DEBUG=Y] [DLL=Y] [WIDE=Y] [UTF8=Y]
-#        [INFOEX=N] [target]
+#        [CHTYPE_32=] [INFOEX=N] [target]
 #
 # where target can be any of:
 # [all|demos|pdcurses.lib|testcurs.exe...]
@@ -14,14 +14,12 @@ RM = del
 PDCURSES_SRCDIR = ..
 !endif
 
-!include $(PDCURSES_SRCDIR)\common\libobjs.mif
-
 osdir		= $(PDCURSES_SRCDIR)\wincon
 common		= $(PDCURSES_SRCDIR)\common
 
-PDCURSES_WIN_H	= $(osdir)\pdcwin.h
+!include $(common)\libobjs.mif
 
-CC		= cl.exe -nologo
+PDCURSES_WIN_H	= $(osdir)\pdcwin.h
 
 !ifdef DEBUG
 CFLAGS		= -Z7 -DPDCDEBUG
@@ -31,6 +29,8 @@ CFLAGS		= -O1
 LDFLAGS		=
 !endif
 
+CFLAGS		= $(CFLAGS) -W3 -D_CRT_SECURE_NO_WARNINGS
+
 !ifdef WIDE
 WIDEOPT		= -DPDC_WIDE
 !endif
@@ -39,17 +39,21 @@ WIDEOPT		= -DPDC_WIDE
 UTF8OPT		= -DPDC_FORCE_UTF8
 !endif
 
+!ifdef CHTYPE_32
+CHTYPE_FLAGS= -DCHTYPE_32
+!endif
+
 !ifdef INFOEX
 INFOPT		= -DHAVE_NO_INFOEX
 !endif
 
-SHL_LD = link $(LDFLAGS) -nologo -dll -machine:$(PLATFORM) -out:pdcurses.dll
-
+CC		= cl.exe -nologo
 LINK		= link.exe -nologo
+SHL_LD		= $(LINK) $(LDFLAGS) -dll -machine:$(PLATFORM) -out:pdcurses.dll
 
-CCLIBS		= user32.lib advapi32.lib
+CCLIBS		= user32.lib advapi32.lib winmm.lib
 # may need to add msvcrt for older compilers
-#CCLIBS		= msvcrt.lib user32.lib advapi32.lib
+#CCLIBS		= msvcrt.lib user32.lib advapi32.lib winmm.lib
 
 LIBEXE		= lib -nologo
 
@@ -63,7 +67,7 @@ PDCLIBS		= $(CURSESDLL)
 PDCLIBS		= $(LIBCURSES)
 !endif
 
-BUILD		= $(CC) -I$(PDCURSES_SRCDIR) -c $(CFLAGS) $(DLLOPT) \
+BUILD		= $(CC) -I$(PDCURSES_SRCDIR) -c $(CFLAGS) $(CHTYPE_FLAGS) $(DLLOPT) \
 $(WIDEOPT) $(UTF8OPT) $(INFOPT)
 
 all:	$(PDCLIBS)
