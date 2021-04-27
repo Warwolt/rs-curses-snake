@@ -207,20 +207,22 @@ int main() {
         /* Draw */
         erase();
         resize_term(0, 0); // without this window resizes messes up printing
-        int top_margin = (LINES - SCREEN_HEIGHT)/2;
-        int left_margin = (COLS - SCREEN_WIDTH)/2;
-
+        int top_margin = (LINES - SCREEN_HEIGHT) / 2;
+        int left_margin = (COLS - SCREEN_WIDTH) / 2;
+        // draw messages
+        mvprintw(top_margin + 5, left_margin + 2, "frame period = %zu\n", elapsed_time);
+        mvprintw(top_margin + 6, left_margin + 2, "elapsed frames = %d\n", elapsed_frames);
+        mvprintw(top_margin + 7, left_margin + 2, "elapsed seconds = %f\n", elapsed_frames / 60.0);
         // draw surrounding box
         draw_horizontal_line(left_margin, top_margin, SCREEN_WIDTH);
         draw_horizontal_line(left_margin, top_margin + SCREEN_HEIGHT - 1, SCREEN_WIDTH);
         draw_vertical_line(left_margin, top_margin + 1, SCREEN_HEIGHT - 1);
         draw_vertical_line(left_margin + SCREEN_WIDTH - 1, top_margin + 1, SCREEN_HEIGHT - 1);
-        // draw messages
-        mvprintw(top_margin + 5, left_margin + 2, "elapsed time = %zu\n", elapsed_time);
-        mvprintw(top_margin + 6, left_margin + 2, "elapsed frames = %d\n", elapsed_frames);
-        mvprintw(top_margin + 7, left_margin + 2, "elapsed seconds = %f\n", elapsed_frames / 60.0);
         // draw snake body
-        draw_snake_body(snake_body);
+        // draw_snake_body(snake_body);
+        wattron(stdscr, COLOR_PAIR(34));
+        mvprintw(0, 0, "Hello there!");
+        wattroff(stdscr, COLOR_PAIR(34));
 
         refresh();
     }

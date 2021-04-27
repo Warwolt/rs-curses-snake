@@ -5,5 +5,8 @@ authors = ["Rasmus <rasmus.kallqvist@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+num = "0.4.0"
+rand = "0.8.3"
 pancurses = { git = "https://github.com/warwolt/pancurses" }
+# pancurses = { version = "0.16.1", features = ["win32"]}
 platform = { path = "./platform" }
