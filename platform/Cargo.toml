@@ -5,4 +5,4 @@ authors = ["Rasmus <rasmus.kallqvist@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-winapi = { version = "0.3.8", features = ["std", "winnt", "winuser"] }
+winapi = { version = "0.3.8", features = ["std", "consoleapi", "processenv", "winbase", "wincon", "impl-default", "profileapi", "winuser"] }

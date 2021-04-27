@@ -19,7 +19,6 @@ dependencies = [
  "pancurses",
  "pdcurses-sys",
  "platform",
- "winapi",
 ]
 
 [[package]]
