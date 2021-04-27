@@ -1,6 +1,6 @@
-mod keyboard;
-extern crate pancurses;
-extern crate winapi;
+use pancurses;
+use keyboard_input;
+use winapi;
 use winapi::shared::ntdef::LARGE_INTEGER;
 use winapi::um::profileapi::{QueryPerformanceFrequency, QueryPerformanceCounter};
 use winapi::um::winuser::VK_ESCAPE;
@@ -56,7 +56,7 @@ fn main() {
     }
 
     /* Run program */
-    let mut keyboard_handler = keyboard::KeyboardHandler::new();
+    let mut keyboard_handler = keyboard_input::KeyboardHandler::new();
     // timing
     let mut prev_time = get_microsec_timestamp();
     let mut elapsed_frames = 0;
@@ -73,7 +73,7 @@ fn main() {
         elapsed_frames += 1;
 
         keyboard_handler.update();
-        if keyboard_handler._key_pressed_now(VK_ESCAPE) {
+        if keyboard_handler.key_pressed_now(VK_ESCAPE) {
             break;
         }
 

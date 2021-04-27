@@ -1,4 +1,6 @@
 /target
+/keyboard_input/target
+/keyboard_input/Cargo.lock
 *.a
 *.o
 *.exe

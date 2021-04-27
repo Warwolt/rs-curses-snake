@@ -73,7 +73,7 @@ impl KeyboardHandler {
         }
     }
 
-    pub fn _key_is_up(&self, key: KeyCode) -> bool {
+    pub fn key_is_up(&self, key: KeyCode) -> bool {
         key_is_up(self.key_states[key as usize])
     }
 
@@ -81,11 +81,11 @@ impl KeyboardHandler {
         key_is_down(self.key_states[key as usize])
     }
 
-    pub fn _key_pressed_now(&self, key: KeyCode) -> bool {
+    pub fn key_pressed_now(&self, key: KeyCode) -> bool {
         self.key_states[key as usize] == KeyState::JustPressed
     }
 
-    pub fn _key_released_now(&self, key: KeyCode) -> bool {
+    pub fn key_released_now(&self, key: KeyCode) -> bool {
         self.key_states[key as usize] == KeyState::JustReleased
     }
 }
