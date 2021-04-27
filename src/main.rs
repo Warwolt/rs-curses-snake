@@ -1,9 +1,9 @@
 use pancurses;
-use keyboard_input;
+use platform;
 use winapi;
 use winapi::shared::ntdef::LARGE_INTEGER;
 use winapi::um::profileapi::{QueryPerformanceFrequency, QueryPerformanceCounter};
-// use winapi::um::winuser::VK_ESCAPE;
+use platform::virtual_keycodes;
 
 // const SCREEN_WIDTH: i32 = 84;
 // const SCREEN_HEIGHT: i32 = 20;
@@ -56,7 +56,7 @@ fn main() {
     }
 
     /* Run program */
-    let mut keyboard_handler = keyboard_input::KeyboardHandler::new();
+    let mut keyboard_handler = platform::keyboard::KeyboardHandler::new();
     // timing
     let mut prev_time = get_microsec_timestamp();
     let mut elapsed_frames = 0;
@@ -73,7 +73,7 @@ fn main() {
         elapsed_frames += 1;
 
         keyboard_handler.update();
-        if keyboard_handler.key_pressed_now(keyboard_input::VK_ESCAPE) {
+        if keyboard_handler.key_pressed_now(virtual_keycodes::VK_ESCAPE) {
             break;
         }
 
@@ -81,7 +81,7 @@ fn main() {
         pancurses::curs_set(0);
         window.erase();
         window.printw(format!("elapsed_frames = {}\n", elapsed_frames));
-        window.printw(format!("COLS = {}, LINES = {}\n", term_columns(), term_lines()));
+        window.printw(format!("COLS = {}, LI2NES = {}\n", term_columns(), term_lines()));
         window.refresh();
     }
     pancurses::endwin();
