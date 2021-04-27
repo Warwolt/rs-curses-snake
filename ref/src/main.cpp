@@ -158,35 +158,10 @@ void draw_snake_body(SnakeBody& snake_body) {
 }
 
 int main() {
-    initscr();
-    keyboard::KeyboardHandler keyboard_handler;
-    int i = 0;
-
-    while (1) {
-        keyboard_handler.update();
-        if (keyboard::any_key_pressed(keyboard_handler)) {
-            break;
-        }
-        i += 1;
-
-        erase();
-        resize_term(0, 0);
-        curs_set(0); // hide cursor
-        printw("i = %d\n", i);
-        printw("COLS = %d, LINES = %d!\n", COLS, LINES);
-        refresh();
-    }
-
-    endwin();
-}
-
-
-int _main() {
     /* Initialize */
     initscr();
     curs_set(0); // hide cursor
     noecho();
-    timeout(0); // non blocking getch
     // initialize colors
     start_color();
     for (int color = 16; color < 256; color++) {
