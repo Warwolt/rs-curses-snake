@@ -7,18 +7,8 @@ use graphics::WindowGraphics;
 
 const SCREEN_WIDTH: i32 = 84;
 const SCREEN_HEIGHT: i32 = 20;
-
-fn term_lines() -> i32 {
-    unsafe {
-        pancurses::LINES
-    }
-}
-
-fn term_columns() -> i32 {
-    unsafe {
-        pancurses::COLS
-    }
-}
+const BORDER_WIDTH: i32 = 80;
+const BORDER_HEIGHT: i32 = 16;
 
 fn main() {
     /* Initialize */
@@ -57,27 +47,38 @@ fn main() {
         pancurses::resize_term(0, 0);
         pancurses::curs_set(0);
         window.erase();
-        window.printw(format!("elapsed_frames = {}\n", elapsed_frames));
-        window.printw(format!("COLS = {}, LINES = {}\n", term_columns(), term_lines()));
+        let top_margin = top_screen_edge() + (SCREEN_HEIGHT - BORDER_HEIGHT) / 2;
+        let left_margin = left_screen_edge() + (SCREEN_WIDTH - BORDER_WIDTH) / 2;
+        // draw messages
+        window.mvprintw(top_margin + 5, left_margin + 2, format!("elapsed_frames = {}\n", elapsed_frames));
+        window.mvprintw(top_margin + 6, left_margin + 2, format!("COLS = {}, LINES = {}\n", term_columns(), term_lines()));
         // draw window borders
-        window.draw_horizontal_line(top_screen_margin(), left_screen_margin(), SCREEN_WIDTH);
-        window.draw_vertical_line(top_screen_margin() + 1, left_screen_margin(), SCREEN_HEIGHT - 1);
-        window.draw_vertical_line(top_screen_margin() + 1, left_screen_margin() + SCREEN_WIDTH - 1, SCREEN_HEIGHT - 1);
-        window.draw_horizontal_line(top_screen_margin() + SCREEN_HEIGHT - 1, left_screen_margin(), SCREEN_WIDTH);
+        window.draw_horizontal_line(top_margin, left_margin, BORDER_WIDTH);
+        window.draw_vertical_line(top_margin + 1, left_margin, BORDER_HEIGHT - 1);
+        window.draw_vertical_line(top_margin + 1, left_margin + BORDER_WIDTH - 1, BORDER_HEIGHT - 1);
+        window.draw_horizontal_line(top_margin + BORDER_HEIGHT - 1, left_margin, BORDER_WIDTH);
 
         window.refresh();
     }
     pancurses::endwin();
 }
 
-fn top_screen_margin() -> i32 {
+fn top_screen_edge() -> i32 {
+    ((term_lines() - SCREEN_HEIGHT) / 2) as i32
+}
+
+fn left_screen_edge() -> i32 {
+    ((term_columns() - SCREEN_WIDTH) / 2) as i32
+}
+
+fn term_lines() -> i32 {
     unsafe {
-        ((pdcurses::LINES - SCREEN_HEIGHT) / 2) as i32
+        pancurses::LINES
     }
 }
 
-fn left_screen_margin() -> i32 {
+fn term_columns() -> i32 {
     unsafe {
-        ((pdcurses::COLS - SCREEN_WIDTH) / 2) as i32
+        pancurses::COLS
     }
 }

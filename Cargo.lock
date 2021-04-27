@@ -17,7 +17,6 @@ name = "curses_snake"
 version = "0.1.0"
 dependencies = [
  "pancurses",
- "pdcurses-sys",
  "platform",
 ]
 

@@ -5,6 +5,5 @@ authors = ["Rasmus <rasmus.kallqvist@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-pdcurses-sys = { git = "https://github.com/warwolt/pdcurses-sys-wmcbrine", branch="main" }
 pancurses = { git = "https://github.com/warwolt/pancurses" }
 platform = { path = "./platform" }
