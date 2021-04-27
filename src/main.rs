@@ -3,7 +3,7 @@ use keyboard_input;
 use winapi;
 use winapi::shared::ntdef::LARGE_INTEGER;
 use winapi::um::profileapi::{QueryPerformanceFrequency, QueryPerformanceCounter};
-use winapi::um::winuser::VK_ESCAPE;
+// use winapi::um::winuser::VK_ESCAPE;
 
 // const SCREEN_WIDTH: i32 = 84;
 // const SCREEN_HEIGHT: i32 = 20;
@@ -73,7 +73,7 @@ fn main() {
         elapsed_frames += 1;
 
         keyboard_handler.update();
-        if keyboard_handler.key_pressed_now(VK_ESCAPE) {
+        if keyboard_handler.key_pressed_now(keyboard_input::VK_ESCAPE) {
             break;
         }
 

@@ -1,3 +1,5 @@
+mod vk_keys;
+pub use vk_keys::*;
 use winapi::um::winnt::SHORT;
 use winapi::um::winuser::GetAsyncKeyState;
 use winapi::um::winuser;
