@@ -1,243 +1,8 @@
-PDCursesMod 4.2 - 2020 Oct 03
-=========================
-
-Major new features
-------------------
-
--  Pulled in almost all of William McBrine's 3.8 and 3.9 changes.
-   These include the single-process X11 port (much simpler and
-   less prone to bugs),  common copy/paste,  some extended colors,
-   and much other good work from wmcbrine over the last few years.
-
--  See history entries for versions 3.8 and 3.9 below for details.
-
--  Added chasonr's DOSVGA port and Federico G. Benavento and Jens
-   Staal's Plan 9 port.
-
--  Automated builds again work and have been extended to new platforms.
-
--  Added ncurses-style init_extended_color(), init_extended_pair(),
-   extended_color_content(),  extended_pair_content() functions.
-   VT and WinGUI versions can now access 2^20 = over a million color
-   pairs and 2^24+256 = 16777472 colors.  This should be extended
-   to SDLx and X11,  and possibly WinCon.
-
--  As a result of all this,  A_RGB is now completely gone (and not
-   really needed anyway).
-
--  Attempts to mis-link a wide-character library to code compiled for
-   8-bit characters,  or a mismatch of a 32-bit chtype library to
-   64-bit chtype code,  etc.,  will usually result in an undefined
-   variant of initscr.  (Previously,  everything would compile,  then
-   crash or produce odd output when the program was run.)  See GitHub
-   issue #133.
-
--  Added 'picsview' demo,  something of a ripoff/homage to Thomas
-   E. Dickey's 'picsmap' demo for ncurses.  It has a similar purpose:
-   demonstrating the functions in the above paragraph and the new
-   ability to access lots and lots of colors.
-
--  HISTORY.md brought up to date for 4.2 (which meant bringing in
-   changes for 3.8 and 3.9).  Also,  4.1.0 was almost completely
-   undocumented.
-
-Minor new features
-------------------
-
--  Name changed from 'PDCurses' to 'PDCursesMod',  in hopes of
-   simultaneously making its origin clear and also making it clear
-   that it's somewhat modified from the parent project.
-
--  Makefiles are better organized and more 'standard'.  'make' builds
-   the PDCurses library,  'make demos' all demos.  The .mif files are
-   all now in the 'common' directory.
-
--  VT port is much faster,  mostly thanks to not writing data to
-   stdout with no buffering and with printf().  It also will use
-   SGR mouse commands if available,  which makes things more bullet
-   proof in cases of confused mouse input,  and means windows can
-   be more than 224 columns wide without crashes happening when
-   the mouse reaches that column.
-
--  Added ncurses extension functions ceiling_panel() and
-   ground_panel().
-
--  'speed' demo tests out speed of the code.
-
--  'test_pan' allows one to move panels around the screen and adjust
-   the panel depth.
-
--  Added ability to change SDL1/SDL2 font rendering mode by setting
-   pdc_sdl_render_mode
-
-Bug fixes and such
-------------------
-
--  Valgrind found three small memory leaks in the VT port (which
-   would apply to all other ports as well).  There are still more
-   leaks in other ports,  which should be addressed.
-
--  Double-clicking in WinGUI got you a click message followed by
-   a double-click.  This does conform to 'standard' Windows practice,
-   but was both stupid and did _not_ conform with the way VT did
-   it,  nor the way I'd want it to be on any port.  To do : enable
-   double and triple clicks on all ports,  not just VT and WinGUI.
-
--  Handling of default background/foreground in VT was just plain
-   wrong.  Now fixed.
-
--  Mouse wheel events now report the correct mouse position,  instead
-   of always reporting (-1, -1).
-
--  Fixed spurious resize events at startup and for window moves on
-   the X11 platform.
-
--  raw() and noraw() now work as specified on WinGUI and VT.  (They
-   still don't work on X11,  SDLn,  or WinCon.)
-
--  User shrinking of the screen to a degree causing a window to be
-   partly off-screen caused a crash.  (In PDCurses,  windows are
-   theoretically always on-screen;  we were not properly prepared
-   for the possibility that the screen might shrink and put windows
-   partly or totally off-screen.)  We no longer crash,  and the part
-   of the window that is still on-screen is refreshed correctly.
-
-See the git log for more details.
-
-PDCurses 4.1.0 - 2019-05-10
-=========================
-
-New features
-------------
-
-- VT backend improved to support different cursors,  mouse move events,
-  and Ctrl/Alt/Shift flags.
-
-- Fixes to allow WinCon builds on platforms lacking INFOEX struct.
-
-- Improved DOS napms to convert milliseconds to BIOS ticks accurately.
-
-- Followed wmcbrine's 'rebranding' of Public Domain Curses to PDCurses.
-
-See the git log for more details.
-
-PDCurses 4.0.4 - 2019-01-20
-=========================
-
-Major new feature:
--------------------
-
-- New VT backend.  Works within an xterm or xterm-based terminal and some
-  other terminals.  Mostly works in the Linux console,  and on Win10
-  directly and on Win9x/DOS if ANSI.SYS (or NANSI or NNANSI .SYS or .COM)
-  are installed.
-
-Minor new features:
--------------------
-
-- SDL2 variant: dimmed,  bold,  blinking,  and RGB text are handled,  as is
-  window resizing.
-
-- DOS variant: cross-compilation from GNU/Linux works with both DJGPP and
-  Watcom C/C++; and, 16-bit and 32-bit Watcom makefiles have been combined
-  into one
-
-- Many modifications (and some bug fixes) taken from William McBrine's
-  branch.  An effort has been made to narrow the gap between the forks
-  where possible.  But both forks are moving targets with different
-  design choices and priorities.
-
-- Demos improved to show version info
-
-Bug fixes
--------------------
-
-- compilation warnings/errors with some compilers in some variants #53, #57, #58, #65, ...
-
-- newtest sample was broken in all wide variants #60
-
-- the paste button printed debug output #62
-
-- some corner cases (midnight crossing, atomicity of tick count reads) in
-  DOS version of napms() were not handled well
-
-See the git log for more details.
-------------------------------------------------------------------------
-
-PDCurses 4.0.2 - 2017-09-12
-=========================
-
-Major new features:
--------------------
-
-- New Win32a(Windows GUI) and SDL2 backends.  SDL1 is still supported,
-  but may eventually go away.
-
-- Bold, italic, underlined, overlined, dimmed, 'strikeout', blinking
-  text, 256 colors and color pairs, and full RGB colors.  These are
-  all supported in Win32a and mostly supported in X11, SDL1 and SDL2.
-
-- In Win32a, one can choose a font, and both programmatic and user
-  resizing are supported.  (Recompiling is necessary to change the
-  font in X11.)
-
-- (Win32a only) Support of SMP Unicode (points beyond 64K) and
-  combining characters.  This may be extended to X11 and SDL2 eventually.
-
-- Demos corrected to be buildable and testable with ncurses.
-
-Minor new features:
--------------------
-
-  (Note that not all of these are available on all backends)
-
-- Support for up to nine mouse buttons and wheel and tilt-wheel mice,
-  and double and triple mouse clicks.
-
-- (X11, Win32a, Win32) Extended range of keys that are recognized.
-  This now includes most of the "oddball" keys such as 'browser back
-  and 'favorites' found on some keyboards.
-
-- Blinking cursors in Win32a and X11 of various shapes (this could be
-  extended to SDLx eventually).
-
-- In X11 and Win32a, one can call resize_term( ) before initscr( ) to
-  set the initial window size.
-
-- Soft Label Keys (SLKs) are considerably more flexible, with the
-  ability to set arbitrary numbers of keys and groupings.   See slk.c
-  for details. This applies to all backends.
-
-- Many changes to testcurs to test all these new features, and newtest
-  added to test still more features.
-
-- Option to get detailed version information of the used PDCurses
-  library at run time with new exported PDC_version as PDC_version_info
-  structure.
-
-- ACS_x and WACS_x #defines extended to include a lot of "alternative
-  characters" that overlap in Unicode and CP-437: double-line box chars,
-  card suits, vulgar fractions, etc.  This applies to all backends. See
-  acs_defs.h for the full list.
-
-- Cleaned up some makefiles for Win32 and Win32a.  On both platforms,
-  vcwin32.mak can now be used with the Intel(R) compiler, and
-  mingwin32.mak can be used to cross-compile from Linux, or in
-  command.com under Windows, or with Cygwin/MSYS.  Also added a
-  makefile for Digital Mars for the DOS version.
-
-- The "def" files that were needed before to create PDCurses on
-  Windows are removed as they are no longer necessary.
-
-See the git log for more details.
-
 PDCurses 3.9 - 2019-09-04
 =========================
 
-IMPORTANT NOTE: This is actually wmcbrine's 3.9 version.  Its
-changes did not actually make it into this fork until 4.1 and 4.2.
-
 768 colors, single-process X11, copy-and-paste for all, and more.
+
 
 New features
 ------------
@@ -277,6 +42,7 @@ New features
   pages for descriptions. Partly due to Karthik Kumar Viswanathan, and
   suggestions of Simon Sobisch.
 
+
 Bug fixes and such
 ------------------
 
@@ -312,10 +78,10 @@ Bug fixes and such
 
 - Smoother resizing in X11, when not in scrollbar mode.
 
-- Dropped X11 options "borderWidth" (broken since at least 2.7) and
+- Dropped X11 options "borderWidth" (broken since at least 2.7) and 
   "cursorColor" (now set automatically for contrast).
 
-- Correctly restore Insert mode and QuickEdit mode in Wincon's
+- Correctly restore Insert mode and QuickEdit mode in Wincon's 
   PDC_reset_shell_mode(). Patch by "vyv03354".
 
 - Add a WINDRES variable to wincon/Makefile for the sake of cross-
@@ -329,7 +95,7 @@ Bug fixes and such
 - Moved the doc files from "man" to "docs" -- the docs/man thing was too
   confusing. Streamlined the web page into two files.
 
-- Rewrote the "Portability" sections of the man pages to reflect current
+- Rewrote the "Portability" sections of the man pages to reflect current 
   ncurses and NetBSD. The old charts weren't very accurate.
 
 - Document resolution of timeout() and napms(). Suggested by S.S.
@@ -338,16 +104,12 @@ Bug fixes and such
 
 - Changed most dates to ISO format.
 
-See the git log (for both PDCursesMod and for wmcbrine's PDCurses,  the
-original source of these changes) for more details.
+See the git log for more details.
 
 ------------------------------------------------------------------------
 
 PDCurses 3.8 - 2019-02-02
 =========================
-
-IMPORTANT NOTE: This is actually wmcbrine's 3.8 version.  Its
-changes did not actually make it into this fork until 4.1.
 
 It's that time again.
 
@@ -400,7 +162,7 @@ Bug fixes and such
 
 - Minor file reorganization / renaming.
 
-- mmask_t is now used in both the classic and ncurses mouse interfaces,
+- mmask_t is now used in both the classic and ncurses mouse interfaces, 
   and is defined in such a way as to keep it at 32 bits.
 
 - Dropped map_button() and getbmap().
@@ -409,8 +171,9 @@ Bug fixes and such
 
 - Made manext.py compatible with Python 3.x.
 
-See the git log (for both PDCursesMod and for wmcbrine's PDCurses,  the
-original source of these changes) for more details.
+See the git log for more details.
+
+------------------------------------------------------------------------
 
 PDCurses 3.7 - 2018-12-31
 =========================
@@ -526,12 +289,9 @@ See the git log for more details.
 PDCurses 3.6 - 2018-02-14
 =========================
 
-[Note : this is a copy of wmcbrine's update history for that version.
-The changes involved have,  however,  now been integrated into
-this fork.]
-
 Tidying up some loose ends from 3.5, and trying to bring all platforms
 up to the same level, as much as possible.
+
 
 New features
 ------------
@@ -787,71 +547,6 @@ Bug fixes and such
   central site is now pdcurses.org.
 
 See the git log for more details.
-
-------------------------------------------------------------------------
-
-PDCurses 4.0.2 - 2017 Sep 12   (Bill Gray fork)
-=========================
-   (Note that history gets confused here;  we have things happening
-in two forks.)
-
-Major new features:
--------------------
-
-- New WinGUI (Windows GUI) and SDL2 backends.
-  SDL1 is still supported, but may eventually go away.
-
-- Bold, italic, underlined, overlined, dimmed, 'strikeout', blinking text,
-  256 colors and color pairs,  and full RGB colors.
-  These are all supported in WinGUI and mostly supported in X11, SDL1 and SDL2.
-
-- In WinGUI, one can choose a font, and both programmatic and user resizing
-  are supported.
-  (Recompiling is necessary to change the font in X11.)
-
-- (WinGUI only) Support of SMP Unicode (points beyond 64K) and combining
-  characters.
-  This may be extended to X11 and SDL2 eventually.
-
-- Demos corrected to be buildable and testable with `ncurses`.
-
-Minor new features
--------------------
-(note that not all of these are available on all backends)
-
-- Support for up to nine mouse buttons and wheel and tilt-wheel mice, and
-  double and triple mouse clicks
-
-- (X11, WinGUI, Win32) Extended range of keys that are recognized. This
-  now includes most of the "oddball" keys such as 'browser back' and
-  'favorites' found on some keyboards.
-
-- Blinking cursors in WinGUI and X11 of various shapes (this could be
-  extended to SDLx eventually).
-
-- In X11 and WinGUI, one can call resize_term( ) before initscr( ) to set
-  the initial window size.
-
-- Soft Label Keys (SLKs) are considerably more flexible,  with the ability
-  to set arbitrary numbers of keys and groupings.
-  See slk.c for details. This applies to all backends.
-
-- Many changes to `testcurs` to test all these new features, and `newtest`
-  added to test still more features.
-
-- Option to get detailed version information of the used PDCurses library
-  at run time with new exported `PDC_version` as `PDC_version_info` structure.
-
-- ACS_x and WACS_x #defines extended to include a lot of "alternative
-  characters" that overlap in Unicode and CP-437:  double-line box chars,
-  card suits,  vulgar fractions,  etc.
-  This applies to all backends.  See `acs_defs.h` for the full list.
-
-- Cleaned up some makefiles for Win32 and WinGUI.
-  On both platforms, `vcwin32.mak` can now be used with the Intel(R) compiler,
-  and `mingwin32.mak` can be used to cross-compile from Linux, or in
-  `command.com` under Windows, or with Cygwin/MSYS.
-  Also added a makefile for Digital Mars for the DOS version.
 
 ------------------------------------------------------------------------
 
@@ -2226,19 +1921,19 @@ OTHER NOTES:
 
  In place of...
 
-       while(!typeahead(stdin))
-        {
-          /* do something until any key is pressed... */
-        }
+	while(!typeahead(stdin))
+	 {
+		/* do something until any key is pressed... */
+	 }
 
  use...
 
-       /* getch() to return ERR if no key pending */
-       nodelay(stdscr,TRUE);
-       while(getch() == (ERR))
-        {
-          /* do something until any key is pressed... */
-        }
+	/* getch() to return ERR if no key pending */
+	nodelay(stdscr,TRUE);
+	while(getch() == (ERR))
+	 {
+		/* do something until any key is pressed... */
+	 }
 
 
 ACKNOWLEDGEMENTS: (in no particular order)
@@ -2605,44 +2300,44 @@ cursesio).
 
   I would like to thank the following persons for their help:
 
-       Brandon S. Allbery (alberry@ncoast.UUCP)
-               for running comp.binaries.ibm.pc (at that time)
-               and comp.source.misc.
+  	Brandon S. Allbery (alberry@ncoast.UUCP)
+		for running comp.binaries.ibm.pc (at that time)
+		and comp.source.misc.
 
-       Steve Balogh (Steve@cit5.cit.oz.AU)
-               for writing a set of manual pages and posting
-               them to the net.
+	Steve Balogh (Steve@cit5.cit.oz.AU)
+  		for writing a set of manual pages and posting
+		them to the net.
 
-       Torbjorn Lindh
-               for finding bugs and suggesting raw
-               character output routines.
+	Torbjorn Lindh
+		for finding bugs and suggesting raw
+		character output routines.
 
-       Nathan Glasser (nathan@eddie.mit.edu)
-               for finding and reporting bugs.
+	Nathan Glasser (nathan@eddie.mit.edu)
+  		for finding and reporting bugs.
 
-       Ingvar Olafsson (...enea!hafro!ingvar)
-               for finding and reporting bugs.
+	Ingvar Olafsson (...enea!hafro!ingvar)
+  		for finding and reporting bugs.
 
-       Eric Rosco (...enea!ipmoea!ericr)
-               for finding and reporting bugs.
+	Eric Rosco (...enea!ipmoea!ericr)
+  		for finding and reporting bugs.
 
-       Steve Creps (creps@silver.bacs.indiana.edu)
-               for doing a lot of work - among others
-               posting bug fixes to the net, and writing
-               the new cursesio.c module.
+	Steve Creps (creps@silver.bacs.indiana.edu)
+  		for doing a lot of work - among others
+		posting bug fixes to the net, and writing
+		the new cursesio.c module.
 
-       N. Dean Pentcheff (dean@violet.berkeley.edu)
-               for finding bugs and rewriting cursesio.asm
-               for Turbo 'C' 1.5.
+	N. Dean Pentcheff (dean@violet.berkeley.edu)
+  		for finding bugs and rewriting cursesio.asm
+		for Turbo 'C' 1.5.
 
   Finally, Jeff Dean (parcvax,hplabs}!cdp!jeff)
-                    (jeff@ads.arpa)
-       has had a shareware version of curses deliverable since
-       about half a year before I released PCcurses 1.0 on Use-
-       Net. He is very concerned about confusion between the two
-       packages, and therefore any references on the network
-       should make clear whether they reference Dean's PCcurses
-       or Larsson's PCcurses.
+  		     (jeff@ads.arpa)
+	has had a shareware version of curses deliverable since
+	about half a year before I released PCcurses 1.0 on Use-
+	Net. He is very concerned about confusion between the two
+	packages, and therefore any references on the network
+	should make clear whether they reference Dean's PCcurses
+	or Larsson's PCcurses.
 
 ------------------------------------------------------------------------
 
@@ -2667,15 +2362,15 @@ makefiles.
 
   There are three makefiles:
 
-       makefile      generic MSC 3.0 makefile
-       makefile.ms      MSC 4.0 makefile
-       makefile.tc      Turbo C 1.0 makefile
+	makefile		generic MSC 3.0 makefile
+	makefile.ms		MSC 4.0 makefile
+	makefile.tc		Turbo C 1.0 makefile
 
   To make a library with for example Turbo C, make directories to hold
 .H and .LIB files (these directories are the 'standard places'), edit
 makefile.tc for this, and type
 
-       make -f makefile.tc all
+	make -f makefile.tc all
 
 and libraries for all memory models will be created in the .LIB
 directory, while the include files will end up in the .H directory. Also

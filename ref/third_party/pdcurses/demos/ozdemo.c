@@ -18,22 +18,18 @@ void trap(int);
 
 char *AusMap[17] =
 {
-    "                 _,__        .:",
-    "         Darwin <*  /        | \\",
-    "            .-./     |.     :  :,",
-    "           /    |      '-._/     \\_",
-    "          /     |   N.T. | '       \\",
-    "        .'      |        |   Qld.  *: Brisbane",
-    "     .-'        |        |           ;",
-    "     |   W.A.   |----------|         |",
-    "     \\          |          |--------/",
-    "      |         |   S.A.   | N.S.W./",
-    "Perth  *        |__.--._   |-,_   *  Sydney",
-    "        \\     _.'       \\:.|Vic'-,|",
-    "        >__,-'   Adelaide  \\_/*_.-'",
-    "                              Melbourne",
-    "                             :--,",
-    "                        Tas.  '* Hobart",
+    "                       A ",
+    "           AA         AA ",
+    "    N.T. AAAAA       AAAA ",
+    "     AAAAAAAAAAA  AAAAAAAA ",
+    "   AAAAAAAAAAAAAAAAAAAAAAAAA Qld.",
+    " AAAAAAAAAAAAAAAAAAAAAAAAAAAA ",
+    " AAAAAAAAAAAAAAAAAAAAAAAAAAAAA ",
+    " AAAAAAAAAAAAAAAAAAAAAAAAAAAA ",
+    "   AAAAAAAAAAAAAAAAAAAAAAAAA N.S.W.",
+    "W.A. AAAAAAAAA      AAAAAA Vic.",
+    "       AAA   S.A.     AA",
+    "                       A  Tas.",
     ""
 };
 
@@ -63,7 +59,7 @@ int WaitForUser(void)
     nocbreak();     /* Reset the halfdelay() value */
     cbreak();
 
-    return (ch == '\033') ? (int)ch : 0;
+    return (ch == '\033') ? ch : 0;
 }
 
 int SubWinTest(WINDOW *win)
@@ -209,31 +205,20 @@ void trap(int sig)
     }
 }
 
-#define INTENTIONALLY_UNUSED_PARAMETER( param) (void)(param)
-
 int main(int argc, char **argv)
 {
     WINDOW *win;
     chtype save[80], ch;
     time_t seed;
-    const int width = 52, height = 22, msg_line = 9;
-    int w, x, y, i, j;
-    const char *versions_1 =
-            " DOS, DOSVGA, OS/2, Plan 9, SDL 1/2,";
-    const char *versions_2 =
-            " VT, Windows console & GUI, X11";
-    const char *hit_any_key =
-            "       Type a key to continue or ESC to quit     ";
+    int width, height, w, x, y, i, j;
 
 #ifdef XCURSES
     Xinitscr(argc, argv);
 #else
-    INTENTIONALLY_UNUSED_PARAMETER( argv);
-    INTENTIONALLY_UNUSED_PARAMETER( argc);
     initscr();
 #endif
     seed = time((time_t *)0);
-    srand( (unsigned)seed);
+    srand(seed);
 
     start_color();
 # if defined(NCURSES_VERSION) || (defined(PDC_BUILD) && PDC_BUILD > 3000)
@@ -255,6 +240,9 @@ int main(int argc, char **argv)
     refresh();
 
     /* Create a drawing window */
+
+    width  = 48;
+    height = 15;
 
     win = newwin(height, width, (LINES - height) / 2, (COLS - width) / 2);
 
@@ -328,7 +316,7 @@ int main(int argc, char **argv)
 
         while (*AusMap[i])
         {
-            mvwaddstr(win, i + 1, 3, AusMap[i]);
+            mvwaddstr(win, i + 1, 8, AusMap[i]);
             wrefresh(win);
             napms(100);
             ++i;
@@ -336,10 +324,13 @@ int main(int argc, char **argv)
 
         init_pair(5, COLOR_BLUE, COLOR_WHITE);
         wattrset(win, COLOR_PAIR(5) | A_BLINK);
-        mvwaddstr( win, height - 5, 2, longname( ));
-        mvwaddstr( win, height - 4, 2, curses_version( ));
-        mvwaddstr( win, height - 3, 2, versions_1);
-        mvwaddstr( win, height - 2, 2, versions_2);
+        mvwaddstr(win, height - 2,
+#ifdef PDC_VERDOT
+            2, " PDCurses " PDC_VERDOT
+#else
+            3, " PDCurses"
+#endif
+            " - DOS, OS/2, Windows, X11, SDL");
         wrefresh(win);
 
         /* Draw running messages */
@@ -349,12 +340,12 @@ int main(int argc, char **argv)
         w = width - 2;
         nodelay(win, TRUE);
 
-        mvwhline(win, msg_line, 1, ' ', w);
+        mvwhline(win, height / 2, 1, ' ', w);
 
         for (j = 0; messages[j] != NULL; j++)
         {
             char *message = messages[j];
-            int msg_len = (int)strlen(message);
+            int msg_len = strlen(message);
             int stop = 0;
             int xpos, start, count;
 
@@ -373,7 +364,7 @@ int main(int argc, char **argv)
                     count = (w > msg_len - start) ? msg_len - start : w;
                 }
 
-                mvwaddnstr(win, msg_line, xpos + 1, message + start, count);
+                mvwaddnstr(win, height / 2, xpos + 1, message + start, count);
                 if (xpos + count < w)
                     waddstr(win, " ");
 
@@ -412,8 +403,10 @@ int main(int argc, char **argv)
 
         /* Put a message up; wait for a key */
 
+        i = height - 2;
         wattrset(win, COLOR_PAIR(5));
-        mvwaddstr(win, msg_line, 2, hit_any_key);
+        mvwaddstr(win, i, 2,
+            "    Type a key to continue or ESC to quit   ");
         wrefresh(win);
 
         if (WaitForUser() == '\033')

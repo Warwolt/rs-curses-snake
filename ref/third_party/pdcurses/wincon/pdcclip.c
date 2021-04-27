@@ -70,9 +70,9 @@ int PDC_getclipboard(char **contents, long *length)
     }
 
 #ifdef PDC_WIDE
-    len = (long)wcslen((wchar_t *)handle) * 3;
+    len = wcslen((wchar_t *)handle) * 3;
 #else
-    len = (long)strlen((char *)handle);
+    len = strlen((char *)handle);
 #endif
     *contents = (char *)GlobalAlloc(GMEM_FIXED, len + 1);
 
@@ -83,7 +83,7 @@ int PDC_getclipboard(char **contents, long *length)
     }
 
 #ifdef PDC_WIDE
-    len = (long)PDC_wcstombs((char *)*contents, (wchar_t *)handle, len);
+    len = PDC_wcstombs((char *)*contents, (wchar_t *)handle, len);
 #else
     strcpy((char *)*contents, (char *)handle);
 #endif

@@ -1,7 +1,6 @@
 /* PDCurses */
 
 #include <curspriv.h>
-#include <assert.h>
 
 /*man-start**************************************************************
 
@@ -48,7 +47,6 @@ void PDC_debug(const char *fmt, ...)
     char hms[9];
     time_t now;
 
-    assert( SP);
     if (!SP || !SP->dbfp)
         return;
 
@@ -75,7 +73,6 @@ void PDC_debug(const char *fmt, ...)
 
 void traceon(void)
 {
-    assert( SP);
     if (!SP)
         return;
 
@@ -98,7 +95,6 @@ void traceon(void)
 
 void traceoff(void)
 {
-    assert( SP);
     if (!SP || !SP->dbfp)
         return;
 

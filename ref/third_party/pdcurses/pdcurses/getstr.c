@@ -1,7 +1,6 @@
 /* PDCurses */
 
 #include <curspriv.h>
-#include <assert.h>
 
 /*man-start**************************************************************
 
@@ -80,7 +79,7 @@ int wgetnstr(WINDOW *win, char *str, int n)
     if (wgetn_wstr(win, (wint_t *)wstr, n) == ERR)
         return ERR;
 
-    return (int)PDC_wcstombs(str, wstr, n);
+    return PDC_wcstombs(str, wstr, n);
 #else
     int ch, i, num, x, chars;
     char *p;
@@ -88,9 +87,6 @@ int wgetnstr(WINDOW *win, char *str, int n)
 
     PDC_LOG(("wgetnstr() - called\n"));
 
-    assert( win);
-    assert( str);
-    assert( SP);
     if (!win || !str)
         return ERR;
 
@@ -126,7 +122,7 @@ int wgetnstr(WINDOW *win, char *str, int n)
                 {
                     if (oldecho)
                         waddch(win, ch);
-                    *p++ = (char)ch;
+                    *p++ = ch;
                     ++chars;
                 }
                 else
@@ -192,7 +188,7 @@ int wgetnstr(WINDOW *win, char *str, int n)
             {
                 if (!SP->key_code && ch < 0x100)
                 {
-                    *p++ = (char)ch;
+                    *p++ = ch;
                     if (oldecho)
                         waddch(win, ch);
                     chars++;
@@ -288,9 +284,6 @@ int wgetn_wstr(WINDOW *win, wint_t *wstr, int n)
 
     PDC_LOG(("wgetn_wstr() - called\n"));
 
-    assert( win);
-    assert( wstr);
-    assert( SP);
     if (!win || !wstr)
         return ERR;
 
@@ -326,7 +319,7 @@ int wgetn_wstr(WINDOW *win, wint_t *wstr, int n)
                 {
                     if (oldecho)
                         waddch(win, ch);
-                    *p++ = (wint_t)ch;
+                    *p++ = ch;
                     ++chars;
                 }
                 else
@@ -392,7 +385,7 @@ int wgetn_wstr(WINDOW *win, wint_t *wstr, int n)
             {
                 if (!SP->key_code)
                 {
-                    *p++ = (wint_t)ch;
+                    *p++ = ch;
                     if (oldecho)
                         waddch(win, ch);
                     chars++;

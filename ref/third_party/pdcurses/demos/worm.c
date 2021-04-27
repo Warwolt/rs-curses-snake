@@ -147,9 +147,6 @@ static void cleanup(void)
     refresh();
     curs_set(1);
     endwin();
-#ifdef PDCURSES
-    delscreen( SP);
-#endif
 }
 
 int main(int argc, char *argv[])
@@ -211,7 +208,7 @@ int main(int argc, char *argv[])
     initscr();
 #endif
     seed = time((time_t *)0);
-    srand( (unsigned)seed);
+    srand(seed);
 
     noecho();
     cbreak();
@@ -360,14 +357,6 @@ int main(int argc, char *argv[])
 
             if (ch == 'q')
             {
-                for (y = 0; y < LINES; y++)
-                    free( ref[y]);
-                free( ref);
-                for( n = 0; n < number; n++)
-                {
-                    free( worm[n].xpos);
-                    free( worm[n].ypos);
-                }
                 cleanup();
                 return EXIT_SUCCESS;
             }
@@ -381,7 +370,7 @@ int main(int argc, char *argv[])
         {
             if ((x = w->xpos[h = w->head]) < 0)
             {
-                move(y = w->ypos[h] = (short)bottom, x = w->xpos[h] = 0);
+                move(y = w->ypos[h] = bottom, x = w->xpos[h] = 0);
                 addch(flavor[n % FLAVORS]);
                 ref[y][x]++;
             }
@@ -420,9 +409,6 @@ int main(int argc, char *argv[])
             switch (op->nopts)
             {
             case 0:
-                for (y = 0; y < LINES; y++)
-                    free( ref[y]);
-                free( ref);
                 cleanup();
                 return EXIT_SUCCESS;
             case 1:
@@ -438,7 +424,7 @@ int main(int argc, char *argv[])
                 y = 0;
 
             addch(flavor[n % FLAVORS]);
-            ref[w->ypos[h] = (short)y][w->xpos[h] = (short)x]++;
+            ref[w->ypos[h] = y][w->xpos[h] = x]++;
         }
         napms(12);
         refresh();

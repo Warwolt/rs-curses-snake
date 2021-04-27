@@ -1,7 +1,6 @@
 /* PDCurses */
 
 #include <curspriv.h>
-#include <assert.h>
 
 /*man-start**************************************************************
 
@@ -70,12 +69,10 @@ int waddnstr(WINDOW *win, const char *str, int n)
 
     PDC_LOG(("waddnstr() - called: string=\"%s\" n %d \n", str, n));
 
-    assert( win);
-    assert( str);
     if (!win || !str)
         return ERR;
 
-    while( (i < n || n < 0) && str[i])
+    while (str[i] && (i < n || n < 0))
     {
 #ifdef PDC_WIDE
         wchar_t wch;
@@ -165,13 +162,10 @@ int waddnwstr(WINDOW *win, const wchar_t *wstr, int n)
 
     PDC_LOG(("waddnwstr() - called\n"));
 
-    assert( win);
-    assert( wstr);
     if (!win || !wstr)
         return ERR;
 
     while (wstr[i] && (i < n || n < 0))
-    while( (i < n || n < 0) && wstr[i])
     {
         chtype wch = wstr[i++];
 

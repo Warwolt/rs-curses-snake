@@ -1,7 +1,6 @@
 /* PDCurses */
 
 #include <curspriv.h>
-#include <assert.h>
 
 /*man-start**************************************************************
 
@@ -76,7 +75,6 @@ int clearok(WINDOW *win, bool bf)
 {
     PDC_LOG(("clearok() - called\n"));
 
-    assert( win);
     if (!win)
         return ERR;
 
@@ -87,8 +85,6 @@ int clearok(WINDOW *win, bool bf)
 
 int idlok(WINDOW *win, bool bf)
 {
-    INTENTIONALLY_UNUSED_PARAMETER( win);
-    INTENTIONALLY_UNUSED_PARAMETER( bf);
     PDC_LOG(("idlok() - called\n"));
 
     return OK;
@@ -96,8 +92,6 @@ int idlok(WINDOW *win, bool bf)
 
 void idcok(WINDOW *win, bool bf)
 {
-    INTENTIONALLY_UNUSED_PARAMETER( win);
-    INTENTIONALLY_UNUSED_PARAMETER( bf);
     PDC_LOG(("idcok() - called\n"));
 }
 
@@ -113,7 +107,6 @@ int leaveok(WINDOW *win, bool bf)
 {
     PDC_LOG(("leaveok() - called\n"));
 
-    assert( win);
     if (!win)
         return ERR;
 
@@ -135,7 +128,6 @@ int wsetscrreg(WINDOW *win, int top, int bottom)
 {
     PDC_LOG(("wsetscrreg() - called: top %d bottom %d\n", top, bottom));
 
-    assert( win);
     if (win && 0 <= top && top <= win->_cury &&
         win->_cury <= bottom && bottom < win->_maxy)
     {
@@ -152,7 +144,6 @@ int scrollok(WINDOW *win, bool bf)
 {
     PDC_LOG(("scrollok() - called\n"));
 
-    assert( win);
     if (!win)
         return ERR;
 
@@ -165,7 +156,6 @@ int raw_output(bool bf)
 {
     PDC_LOG(("raw_output() - called\n"));
 
-    assert( SP);
     if (!SP)
         return ERR;
 
@@ -178,7 +168,6 @@ bool is_leaveok(const WINDOW *win)
 {
     PDC_LOG(("is_leaveok() - called\n"));
 
-    assert( win);
     if (!win)
         return FALSE;
 

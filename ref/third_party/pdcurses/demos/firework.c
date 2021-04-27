@@ -14,8 +14,6 @@ short color_table[] =
     COLOR_RED, COLOR_MAGENTA, COLOR_YELLOW, COLOR_WHITE
 };
 
-#define INTENTIONALLY_UNUSED_PARAMETER( param) (void)(param)
-
 int main(int argc, char **argv)
 {
     time_t seed;
@@ -25,8 +23,6 @@ int main(int argc, char **argv)
 #ifdef XCURSES
     Xinitscr(argc, argv);
 #else
-    INTENTIONALLY_UNUSED_PARAMETER( argv);
-    INTENTIONALLY_UNUSED_PARAMETER( argc);
     initscr();
 #endif
     keypad(stdscr, TRUE);
@@ -40,7 +36,7 @@ int main(int argc, char **argv)
         init_pair(i, color_table[i], COLOR_BLACK);
 
     seed = time((time_t *)0);
-    srand( (unsigned)seed);
+    srand(seed);
     flag = 0;
 
     while (getch() == ERR)      /* loop until a key is hit */

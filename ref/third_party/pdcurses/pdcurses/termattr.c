@@ -1,7 +1,6 @@
 /* PDCurses */
 
 #include <curspriv.h>
-#include <assert.h>
 
 /*man-start**************************************************************
 
@@ -113,7 +112,6 @@ char *longname(void)
 {
     PDC_LOG(("longname() - called\n"));
 
-    sprintf(ttytype, "pdcurses|PDCurses for %s", PDC_sysname());
     return ttytype + 9; /* skip "pdcurses|" */
 }
 
@@ -152,7 +150,6 @@ int erasewchar(wchar_t *ch)
 {
     PDC_LOG(("erasewchar() - called\n"));
 
-    assert( ch);
     if (!ch)
         return ERR;
 
@@ -165,7 +162,6 @@ int killwchar(wchar_t *ch)
 {
     PDC_LOG(("killwchar() - called\n"));
 
-    assert( ch);
     if (!ch)
         return ERR;
 
