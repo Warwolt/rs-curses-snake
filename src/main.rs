@@ -5,17 +5,16 @@ use platform;
 use platform::keyboard::{KeyboardHandler};
 use platform::virtual_keycodes;
 use graphics::WindowGraphics;
-use glam::Vec2;
 use glam::IVec2;
 use glam::f32;
 use glam::i32;
 
 enum Direction {Up, Left, Down, Right}
 
-macro_rules! vecvec2 {
-    ($({$it1:expr, $it2:expr}),*) => {
+macro_rules! vecivec2 {
+    ($(($it1:expr, $it2:expr)),*) => {
         vec![$(
-            f32::vec2($it1, $it2)
+            i32::ivec2($it1, $it2)
         ),*]
     }
 }
@@ -37,8 +36,7 @@ fn main() {
     let mut prev_time = platform::timing::get_microsec_timestamp();
     let mut elapsed_frames = 0;
     // snake
-    let mut snake_head = i32::ivec2(0, 0);
-    // let snake_body = vecvec2![{0.0, 0.0}, {2.0, 0.0}, {2.0, 2.0}, {4.0, 2.0}];
+    let mut snake_body = vecivec2![(0, 0)];
 
     loop {
         // Check if enough time has elapsed to run the next frame, if not
@@ -59,7 +57,7 @@ fn main() {
         }
         // move head if direction key pressed
         if let Some(dir) = get_direction(&keyboard_handler) {
-            snake_head += translation_vec(dir, 500);
+            snake_body[0] += translation_vec(dir, 500);
         }
 
         /* Draw */
@@ -71,7 +69,7 @@ fn main() {
         let messages = [
             format!("elapsed_frames = {}\n", elapsed_frames),
             format!("COLS = {}, LINES = {}\n", graphics::term_columns(), graphics::term_lines()),
-            format!("pos = ({}, {})", snake_head.x as f32 / 1000.0, snake_head.y as f32 / 1000.0)];
+            format!("pos = ({}, {})", snake_body[0].x as f32 / 1000.0, snake_body[0].y as f32 / 1000.0)];
         for i in 0..messages.len() {
             window.mvprintw(top_margin + 5 + i as i32, left_margin + 2, &messages[i]);
         }
@@ -83,13 +81,15 @@ fn main() {
 
         // draw snake
         window.attrset(pancurses::COLOR_PAIR(34));
-        // let snake_body_view = shift_line_segments(&snake_body, left_margin + 2, top_margin + 1);
-        // window.draw_line_segments(&snake_body_view);
-        let snake_x = (snake_head.x as f32 / 1000.0).round();
-        let snake_y = (snake_head.y as f32 / 1000.0).round();
-        let snake_head = &vecvec2![{snake_x, snake_y}];
-        let snake_body_view = shift_line_segments(snake_head, left_margin + 1, top_margin + 1);
-        window.draw_line_segments(&snake_body_view);
+        fn scale_segment(seg: &i32::IVec2) -> i32::IVec2 {
+            i32::ivec2((seg.x as f32 / 1000.0).round() as i32,
+                (seg.y as f32 / 1000.0).round() as i32)
+        }
+        let top_border = top_margin + 1;
+        let left_border = left_margin + 1;
+        let scaled_body = snake_body.iter().map(scale_segment).collect::<Vec<_>>();
+        let shifted_body = shift_line_segments(&scaled_body, left_border, top_border);
+        window.draw_line_segments(&shifted_body);
         window.attroff(pancurses::COLOR_PAIR(34));
 
         window.refresh();
@@ -99,8 +99,8 @@ fn main() {
 
 /// Used for "camera", moving line segments into the part of the screen we want
 /// to draw them at based on their local x,y coordinates
-fn shift_line_segments(line_segments: &Vec<Vec2>, x: i32, y: i32) -> Vec<Vec2> {
-    line_segments.iter().map(|seg| f32::vec2(seg.x + x as f32, seg.y + y as f32)).collect()
+fn shift_line_segments(line_segments: &Vec<IVec2>, x: i32, y: i32) -> Vec<IVec2> {
+    line_segments.iter().map(|seg| i32::ivec2(seg.x + x, seg.y + y)).collect()
 }
 
 /// Get which direction key is pressed, if any
