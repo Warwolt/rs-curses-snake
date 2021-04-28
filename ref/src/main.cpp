@@ -174,7 +174,7 @@ int main() {
     long prev_time = get_microsec_timestamp();
     int elapsed_frames = 0;
     // snake
-    SnakeBody snake_body = {{0,0}, {2,0}, {2,2}, {4,2}, {4,4}, {6,4}};
+    SnakeBody snake_body = {{0.0,0.0}, {2.0,0.0}, {2.0,2.0}, {4.0,2.0}};
     float pos_dx = 0;
     float pos_dy = 0;
     float pos_x = 0;
@@ -219,10 +219,7 @@ int main() {
         draw_vertical_line(left_margin, top_margin + 1, SCREEN_HEIGHT - 1);
         draw_vertical_line(left_margin + SCREEN_WIDTH - 1, top_margin + 1, SCREEN_HEIGHT - 1);
         // draw snake body
-        // draw_snake_body(snake_body);
-        wattron(stdscr, COLOR_PAIR(34));
-        mvprintw(0, 0, "Hello there!");
-        wattroff(stdscr, COLOR_PAIR(34));
+        draw_snake_body(snake_body);
 
         refresh();
     }

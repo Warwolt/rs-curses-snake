@@ -5,8 +5,10 @@ authors = ["Rasmus <rasmus.kallqvist@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-num = "0.4.0"
 rand = "0.8.3"
 pancurses = { git = "https://github.com/warwolt/pancurses" }
+glam = "0.14.0"
+# pancurses = { path = "C:/dev/rust/bindgen/pancurses-wmcbrine" }
 # pancurses = { version = "0.16.1", features = ["win32"]}
+# pdcurses-sys = { git = "https://github.com/warwolt/pdcurses-sys-wmcbrine", branch="main" }
 platform = { path = "./platform" }
