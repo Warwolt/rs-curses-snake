@@ -62,16 +62,12 @@ Vec2 get_new_segment(Direction dir, Vec2 last_segment) {
     switch (dir) {
         case Direction::Right:
             return {last_segment.x + 1, last_segment.y};
-            break;
         case Direction::Up:
             return {last_segment.x, last_segment.y - 1};
-            break;
         case Direction::Left:
             return {last_segment.x - 1, last_segment.y};
-            break;
         case Direction::Down:
             return {last_segment.x, last_segment.y + 1};
-            break;
     }
     return {0, 0}; // unreachable
 }

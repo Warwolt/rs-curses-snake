@@ -11,6 +11,8 @@ use glam::i32;
 
 enum Direction {Up, Left, Down, Right}
 
+/// Macro for creating a Vec<IVec2> literal value
+/// e.g. `let my_vec = vecivec![(1, 2), (3, 4), (5, 0)];`
 macro_rules! vecivec2 {
     ($(($it1:expr, $it2:expr)),*) => {
         vec![$(
@@ -36,7 +38,7 @@ fn main() {
     let mut prev_time = platform::timing::get_microsec_timestamp();
     let mut elapsed_frames = 0;
     // snake
-    let mut snake_body = vecivec2![(0, 0)];
+    let mut snake_body = vecivec2![(0, 0), (1000, 0)];
 
     loop {
         // Check if enough time has elapsed to run the next frame, if not
@@ -48,16 +50,22 @@ fn main() {
         }
         prev_time = time_now;
         elapsed_frames += 1;
-        window.erase(); // erase here so we can debug print
+        window.erase(); // erasing here so we can debug print
 
         /* Update */
         keyboard_handler.update();
         if keyboard_handler.key_pressed_now(virtual_keycodes::VK_ESCAPE) {
-            break;
+            break; // quit program if escape is pressed
         }
-        // move head if direction key pressed
+
+        // move snake body if direction key pressed
+        // TODO: just always move the body in last direction
         if let Some(dir) = get_direction(&keyboard_handler) {
-            snake_body[0] += translation_vec(dir, 500);
+            let x_speed = 500;
+            let last_segment = snake_body[snake_body.len() - 1];
+            let new_segment = get_new_segment(dir, last_segment, x_speed);
+            shorten_tail(&mut snake_body, x_speed);
+            snake_body.push(new_segment);
         }
 
         /* Draw */
@@ -69,7 +77,7 @@ fn main() {
         let messages = [
             format!("elapsed_frames = {}\n", elapsed_frames),
             format!("COLS = {}, LINES = {}\n", graphics::term_columns(), graphics::term_lines()),
-            format!("pos = ({}, {})", snake_body[0].x as f32 / 1000.0, snake_body[0].y as f32 / 1000.0)];
+            format!("snake_body = {:?}", snake_body)];
         for i in 0..messages.len() {
             window.mvprintw(top_margin + 5 + i as i32, left_margin + 2, &messages[i]);
         }
@@ -122,7 +130,7 @@ fn get_direction(keyboard_handler: &KeyboardHandler) -> Option<Direction> {
 fn translation_vec(dir: Direction, x_speed: i32) -> IVec2 {
     // since characters are taller than they are wide we must scale the y-axis
     // to get consistent movement speed in all directions.
-    let y_speed = (x_speed as f32 * 11.0/24.0).round() as i32;
+    let y_speed = y_speed(x_speed);
     match dir {
         Direction::Right => i32::ivec2(x_speed, 0),
         Direction::Left => i32::ivec2(-x_speed, 0),
@@ -131,3 +139,57 @@ fn translation_vec(dir: Direction, x_speed: i32) -> IVec2 {
     }
 }
 
+fn y_speed(x_speed: i32) -> i32 {
+    (x_speed as f32 * 11.0/24.0).round() as i32
+}
+
+fn get_new_segment(dir: Direction, last_segment: IVec2, x_speed: i32) -> IVec2 {
+    let y_speed = (x_speed as f32 * 11.0/24.0).round() as i32;
+    match dir {
+        Direction::Right => {
+            i32::ivec2(last_segment.x + x_speed, last_segment.y)
+        },
+        Direction::Up => {
+            i32::ivec2(last_segment.x, last_segment.y - y_speed)
+        },
+        Direction::Left => {
+            i32::ivec2(last_segment.x - x_speed, last_segment.y)
+        }
+        Direction::Down => {
+            i32::ivec2(last_segment.x, last_segment.y + y_speed)
+        }
+    }
+}
+
+fn shorten_tail(snake_body: &mut Vec<IVec2>, x_speed: i32) {
+    if snake_body.len() < 2 {
+        return;
+    }
+
+    let delta = snake_body[1] - snake_body[0];
+    // shorten horizontally
+    if delta.y == 0 {
+        // move last segment
+        let x_sign = i32::signum(delta.x);
+        snake_body[0].x += x_speed * x_sign;
+        // if signs differ then the last segment has moved past second to last
+        // segment and should be removed
+        let delta2 = snake_body[1] - snake_body[0];
+        if i32::signum(delta2.x) != x_sign {
+            snake_body.remove(0);
+        }
+    }
+    // shorten vertically
+    else {
+        // move last segment
+        let y_speed = y_speed(x_speed);
+        let y_sign = i32::signum(delta.y);
+        snake_body[0].y += y_speed * y_sign;
+        // if signs differ then the last segment has moved past second to last
+        // segment and should be removed
+        let delta2 = snake_body[1] - snake_body[0];
+        if i32::signum(delta2.y) != y_sign {
+            snake_body.remove(0);
+        }
+    }
+}
