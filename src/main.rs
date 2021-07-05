@@ -1,25 +1,18 @@
 mod graphics;
+#[macro_use]
+mod rectilinear;
 
+use glam::i32;
+use glam::IVec2;
+use graphics::WindowGraphics;
 use pancurses;
 use platform;
-use platform::keyboard::{KeyboardHandler};
+use platform::keyboard::KeyboardHandler;
 use platform::virtual_keycodes;
-use graphics::WindowGraphics;
-use glam::IVec2;
-use glam::f32;
-use glam::i32;
-
-enum Direction {Up, Left, Down, Right}
-
-/// Macro for creating a Vec<IVec2> literal value
-/// e.g. `let my_vec = vecivec![(1, 2), (3, 4), (5, 0)];`
-macro_rules! vecivec2 {
-    ($(($it1:expr, $it2:expr)),*) => {
-        vec![$(
-            i32::ivec2($it1, $it2)
-        ),*]
-    }
-}
+use rectilinear::ChainedLineSegment;
+use rectilinear::Direction;
+use rectilinear::RectilinearLine;
+use std::collections::VecDeque;
 
 fn main() {
     /* Initialize */
@@ -38,19 +31,31 @@ fn main() {
     let mut prev_time = platform::timing::get_microsec_timestamp();
     let mut elapsed_frames = 0;
     // snake
-    let mut snake_body = vecivec2![(0, 0), (1000, 0)];
+    let movement_period = 6;
+    let mut snake_body = RectilinearLine {
+        start: i32::ivec2(2, 2),
+        segments: VecDeque::from(vec![
+            seg!(Direction::Right, 2),
+            seg!(Direction::Down, 2),
+            seg!(Direction::Right, 2),
+            seg!(Direction::Up, 4),
+            seg!(Direction::Right, 5),
+        ]),
+    };
+    let mut current_dir = snake_body.dir().unwrap();
 
     loop {
         // Check if enough time has elapsed to run the next frame, if not
         // enough has elapsed then skip rest of the game loop
         let time_now = platform::timing::get_microsec_timestamp();
         let elapsed_frame_time = time_now - prev_time;
-        if elapsed_frame_time <= (1e6/60.0) as i64 {
+        if elapsed_frame_time <= (1e6 / 60.0) as i64 {
             continue;
         }
         prev_time = time_now;
         elapsed_frames += 1;
-        window.erase(); // erasing here so we can debug print
+
+        window.erase(); // erasing here so we can debug print during update
 
         /* Update */
         keyboard_handler.update();
@@ -58,14 +63,16 @@ fn main() {
             break; // quit program if escape is pressed
         }
 
-        // move snake body if direction key pressed
-        // TODO: just always move the body in last direction
+        // update movement variables
         if let Some(dir) = get_direction(&keyboard_handler) {
-            let x_speed = 500;
-            let last_segment = snake_body[snake_body.len() - 1];
-            let new_segment = get_new_segment(dir, last_segment, x_speed);
-            shorten_tail(&mut snake_body, x_speed);
-            snake_body.push(new_segment);
+            // only allow turning 90 degrees, not 180
+            if dir != current_dir.opposite() {
+                current_dir = dir;
+            }
+        }
+        // move snake body
+        if elapsed_frames % movement_period == 0 {
+            snake_body.move_forward(current_dir)
         }
 
         /* Draw */
@@ -76,39 +83,80 @@ fn main() {
         // draw messages
         let messages = [
             format!("elapsed_frames = {}\n", elapsed_frames),
-            format!("COLS = {}, LINES = {}\n", graphics::term_columns(), graphics::term_lines()),
-            format!("snake_body = {:?}", snake_body)];
+            format!(
+                "COLS = {}, LINES = {}\n",
+                graphics::term_columns(),
+                graphics::term_lines()
+            ),
+            format!("direction = {:?}", current_dir),
+        ];
         for i in 0..messages.len() {
             window.mvprintw(top_margin + 5 + i as i32, left_margin + 2, &messages[i]);
         }
         // draw window borders
         window.draw_horizontal_line(top_margin + 0, left_margin + 0, graphics::BORDER_WIDTH);
         window.draw_vertical_line(top_margin + 1, left_margin + 0, graphics::BORDER_HEIGHT - 1);
-        window.draw_vertical_line(top_margin + 1, left_margin + graphics::BORDER_WIDTH - 1, graphics::BORDER_HEIGHT - 1);
-        window.draw_horizontal_line(top_margin + graphics::BORDER_HEIGHT - 1, left_margin, graphics::BORDER_WIDTH);
+        window.draw_vertical_line(
+            top_margin + 1,
+            left_margin + graphics::BORDER_WIDTH - 1,
+            graphics::BORDER_HEIGHT - 1,
+        );
+        window.draw_horizontal_line(
+            top_margin + graphics::BORDER_HEIGHT - 1,
+            left_margin,
+            graphics::BORDER_WIDTH,
+        );
 
         // draw snake
-        window.attrset(pancurses::COLOR_PAIR(34));
-        fn scale_segment(seg: &i32::IVec2) -> i32::IVec2 {
-            i32::ivec2((seg.x as f32 / 1000.0).round() as i32,
-                (seg.y as f32 / 1000.0).round() as i32)
-        }
-        let top_border = top_margin + 1;
-        let left_border = left_margin + 1;
-        let scaled_body = snake_body.iter().map(scale_segment).collect::<Vec<_>>();
-        let shifted_body = shift_line_segments(&scaled_body, left_border, top_border);
-        window.draw_line_segments(&shifted_body);
-        window.attroff(pancurses::COLOR_PAIR(34));
+        let snake_color = if snake_body.is_self_overlapping() { 88 } else { 34 };
+        window.attrset(pancurses::COLOR_PAIR(snake_color));
+        draw_snake(&window, &snake_body);
+        window.attroff(pancurses::COLOR_PAIR(snake_color));
 
         window.refresh();
     }
     pancurses::endwin();
 }
 
+fn draw_snake(window: &pancurses::Window, snake_body: &RectilinearLine) {
+    let mut x = graphics::left_screen_margin() + 1 + snake_body.start.x;
+    let mut y = graphics::top_screen_margin() + 2 + snake_body.start.y;
+
+    if snake_body.len() == 1 {
+        window.draw_horizontal_line(y, x, 1);
+        return;
+    }
+
+    for segment in &snake_body.segments {
+        let len = segment.len as i32;
+        match segment.dir {
+            Direction::Up => {
+                window.draw_vertical_line(y - len, x, len + 1);
+                y -= len;
+            }
+            Direction::Down => {
+                window.draw_vertical_line(y, x, len + 1);
+                y += len;
+            }
+            Direction::Left => {
+                window.draw_horizontal_line(y, x - len, len + 1);
+                x -= len;
+            }
+            Direction::Right => {
+                window.draw_horizontal_line(y, x, len + 1);
+                x += len;
+            }
+        }
+    }
+}
+
 /// Used for "camera", moving line segments into the part of the screen we want
 /// to draw them at based on their local x,y coordinates
-fn shift_line_segments(line_segments: &Vec<IVec2>, x: i32, y: i32) -> Vec<IVec2> {
-    line_segments.iter().map(|seg| i32::ivec2(seg.x + x, seg.y + y)).collect()
+fn _shift_line_segments(line_segments: &Vec<IVec2>, x: i32, y: i32) -> Vec<IVec2> {
+    line_segments
+        .iter()
+        .map(|seg| i32::ivec2(seg.x + x, seg.y + y))
+        .collect()
 }
 
 /// Get which direction key is pressed, if any
@@ -124,72 +172,5 @@ fn get_direction(keyboard_handler: &KeyboardHandler) -> Option<Direction> {
         Some(Direction::Down)
     } else {
         None
-    }
-}
-
-fn translation_vec(dir: Direction, x_speed: i32) -> IVec2 {
-    // since characters are taller than they are wide we must scale the y-axis
-    // to get consistent movement speed in all directions.
-    let y_speed = y_speed(x_speed);
-    match dir {
-        Direction::Right => i32::ivec2(x_speed, 0),
-        Direction::Left => i32::ivec2(-x_speed, 0),
-        Direction::Down => i32::ivec2(0, y_speed),
-        Direction::Up => i32::ivec2(0, -y_speed),
-    }
-}
-
-fn y_speed(x_speed: i32) -> i32 {
-    (x_speed as f32 * 11.0/24.0).round() as i32
-}
-
-fn get_new_segment(dir: Direction, last_segment: IVec2, x_speed: i32) -> IVec2 {
-    let y_speed = (x_speed as f32 * 11.0/24.0).round() as i32;
-    match dir {
-        Direction::Right => {
-            i32::ivec2(last_segment.x + x_speed, last_segment.y)
-        },
-        Direction::Up => {
-            i32::ivec2(last_segment.x, last_segment.y - y_speed)
-        },
-        Direction::Left => {
-            i32::ivec2(last_segment.x - x_speed, last_segment.y)
-        }
-        Direction::Down => {
-            i32::ivec2(last_segment.x, last_segment.y + y_speed)
-        }
-    }
-}
-
-fn shorten_tail(snake_body: &mut Vec<IVec2>, x_speed: i32) {
-    if snake_body.len() < 2 {
-        return;
-    }
-
-    let delta = snake_body[1] - snake_body[0];
-    // shorten horizontally
-    if delta.y == 0 {
-        // move last segment
-        let x_sign = i32::signum(delta.x);
-        snake_body[0].x += x_speed * x_sign;
-        // if signs differ then the last segment has moved past second to last
-        // segment and should be removed
-        let delta2 = snake_body[1] - snake_body[0];
-        if i32::signum(delta2.x) != x_sign {
-            snake_body.remove(0);
-        }
-    }
-    // shorten vertically
-    else {
-        // move last segment
-        let y_speed = y_speed(x_speed);
-        let y_sign = i32::signum(delta.y);
-        snake_body[0].y += y_speed * y_sign;
-        // if signs differ then the last segment has moved past second to last
-        // segment and should be removed
-        let delta2 = snake_body[1] - snake_body[0];
-        if i32::signum(delta2.y) != y_sign {
-            snake_body.remove(0);
-        }
     }
 }
