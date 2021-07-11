@@ -42,117 +42,6 @@ long get_microsec_timestamp() {
     return microsec_ticks;
 }
 
-std::optional<Direction> get_direction(keyboard::KeyboardHandler& keyboard_handler) {
-        if (keyboard_handler.key_pressed_now(VK_LEFT)) {
-            return Direction::Left;
-        }
-        else if (keyboard_handler.key_pressed_now(VK_RIGHT)) {
-            return Direction::Right;
-        }
-        else if (keyboard_handler.key_pressed_now(VK_DOWN)) {
-            return Direction::Down;
-        }
-        else if (keyboard_handler.key_pressed_now(VK_UP)) {
-            return Direction::Up;
-        }
-        return {};
-}
-
-Vec2 get_new_segment(Direction dir, Vec2 last_segment) {
-    switch (dir) {
-        case Direction::Right:
-            return {last_segment.x + 1, last_segment.y};
-        case Direction::Up:
-            return {last_segment.x, last_segment.y - 1};
-        case Direction::Left:
-            return {last_segment.x - 1, last_segment.y};
-        case Direction::Down:
-            return {last_segment.x, last_segment.y + 1};
-    }
-    return {0, 0}; // unreachable
-}
-
-// shortens the tail of the snake by moving the last segment one step towards
-// the second to last segment.
-void shorten_tail(SnakeBody& body) {
-    if (body.size() < 2) {
-        return;
-    }
-
-    Vec2 delta = body[1] - body[0];
-    // horizontal
-    if (delta.y == 0) {
-        int sign_x = delta.x < 0 ? -1 : 1;
-        body[0].x += sign_x;
-        if (body[0].x == body[1].x) {
-            body.erase(body.begin());
-        }
-    }
-    // vertical
-    else {
-        int sign_y = delta.y < 0 ? -1 : 1;
-        body[0].y += sign_y;
-        if (body[0].y == body[1].y) {
-            body.erase(body.begin());
-        }
-    }
-}
-
-void move_snake_body(SnakeBody& snake_body, Direction dir) {
-    Vec2 last_segment = snake_body[snake_body.size() - 1];
-    Vec2 new_segment = get_new_segment(dir, last_segment);
-    shorten_tail(snake_body);
-    snake_body.push_back(new_segment);
-}
-
-void draw_horizontal_line(int x, int y, int width) {
-    int sign = width < 0 ? -1 : 1;
-    for (int i = 0; i < abs(width); i++) {
-        mvprintw(y, x + i * sign, "%c", 219);
-    }
-}
-
-void draw_vertical_line(int x, int y, int height) {
-    int sign = height < 0 ? -1 : 1;
-    for (int i = 0; i < abs(height); i++) {
-        mvprintw(y + i * sign, x, "%c", 219);
-    }
-}
-
-// void draw_snake_head()
-
-void draw_snake_body(SnakeBody& snake_body) {
-    if (snake_body.empty()) {
-        return;
-    }
-
-    int top_margin = (LINES - SCREEN_HEIGHT)/2;
-    int left_margin = (COLS - SCREEN_WIDTH)/2;
-
-    attron(COLOR_PAIR(34));
-    if (snake_body.size() == 1) {
-        int x = round(left_margin + 2 + snake_body[0].x);
-        int y = round(top_margin + 1 + snake_body[0].y);
-        draw_horizontal_line(x, y, 1);
-        attroff(COLOR_PAIR(34));
-        return;
-    }
-
-    for (int i = 0; i < snake_body.size() - 1; i++) {
-        int x = round(left_margin + 2 + snake_body[i].x);
-        int y = round(top_margin + 1 + snake_body[i].y);
-        Vec2 delta = snake_body[i+1] - snake_body[i];
-        if (delta.y == 0) {
-            int sign_x = delta.x < 0 ? -1 : 1;
-            draw_horizontal_line(x, y, delta.x + sign_x);
-        } else {
-            int sign_y = delta.y < 0 ? -1 : 1;
-            draw_vertical_line(x, y, delta.y + sign_y);
-        }
-    }
-    attroff(COLOR_PAIR(34));
-}
-
 int main() {
     /* Initialize */
     initscr();
@@ -169,12 +58,6 @@ int main() {
     // timing
     long prev_time = get_microsec_timestamp();
     int elapsed_frames = 0;
-    // snake
-    SnakeBody snake_body = {{0.0,0.0}, {2.0,0.0}, {2.0,2.0}, {4.0,2.0}};
-    float pos_dx = 0;
-    float pos_dy = 0;
-    float pos_x = 0;
-    float pos_y = 0;
 
     while (1) {
         long time_now = get_microsec_timestamp();
@@ -192,30 +75,22 @@ int main() {
             break;
         }
 
+        clear();
 
-        /* Update */
-        // move snake body
-        std::optional<Direction> dir = get_direction(keyboard_handler);
-        if (dir.has_value()) {
-            move_snake_body(snake_body, dir.value());
-        }
-
-        /* Draw */
-        erase();
-        resize_term(0, 0); // without this window resizes messes up printing
-        int top_margin = (LINES - SCREEN_HEIGHT) / 2;
-        int left_margin = (COLS - SCREEN_WIDTH) / 2;
-        // draw messages
-        mvprintw(top_margin + 5, left_margin + 2, "frame period = %zu\n", elapsed_time);
-        mvprintw(top_margin + 6, left_margin + 2, "elapsed frames = %d\n", elapsed_frames);
-        mvprintw(top_margin + 7, left_margin + 2, "elapsed seconds = %f\n", elapsed_frames / 60.0);
-        // draw surrounding box
-        draw_horizontal_line(left_margin, top_margin, SCREEN_WIDTH);
-        draw_horizontal_line(left_margin, top_margin + SCREEN_HEIGHT - 1, SCREEN_WIDTH);
-        draw_vertical_line(left_margin, top_margin + 1, SCREEN_HEIGHT - 1);
-        draw_vertical_line(left_margin + SCREEN_WIDTH - 1, top_margin + 1, SCREEN_HEIGHT - 1);
-        // draw snake body
-        draw_snake_body(snake_body);
+        // test out attributes
+        // https://unix.stackexchange.com/a/151717/354394
+        attron(A_BOLD);
+        addstr("Twinkle, twinkle little star\n");
+        attron(A_BLINK);
+        addstr("How I wonder what you are.\n");
+        attroff(A_BOLD);
+        addstr("Up above the world so high,\n");
+        attrset(A_NORMAL);
+        addstr("Like a diamond in the sky.\n");
+        attron(A_REVERSE);
+        addstr("Twinkle, twinkle little star\n");
+        attrset(A_NORMAL);
+        addstr("How I wonder what you are.\n");
 
         refresh();
     }

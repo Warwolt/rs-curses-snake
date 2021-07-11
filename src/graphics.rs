@@ -1,5 +1,5 @@
-use pancurses::Window;
 use glam::IVec2;
+use pancurses::Window;
 
 const BOX_CHAR: char = '█';
 
@@ -32,15 +32,15 @@ impl WindowGraphics for Window {
             }
             // else draw out each len-1 segments
             len => {
-                for i in 0..len-1 {
+                for i in 0..len - 1 {
                     let x = line_segments[i].x;
                     let y = line_segments[i].y;
-                    let delta = line_segments[i+1] - line_segments[i];
+                    let delta = line_segments[i + 1] - line_segments[i];
                     if delta.y == 0 {
-                        let sign_x = if delta.x < 0 {-1} else {1};
+                        let sign_x = if delta.x < 0 { -1 } else { 1 };
                         self.draw_horizontal_line(y, x, delta.x + sign_x);
                     } else {
-                        let sign_y = if delta.y < 0 {-1} else {1};
+                        let sign_y = if delta.y < 0 { -1 } else { 1 };
                         self.draw_vertical_line(y, x, delta.y + sign_y);
                     }
                 }
@@ -54,7 +54,6 @@ pub const SCREEN_WIDTH: i32 = 84;
 pub const SCREEN_HEIGHT: i32 = 20;
 pub const BORDER_WIDTH: i32 = 80;
 pub const BORDER_HEIGHT: i32 = 16;
-
 
 pub fn top_screen_edge() -> i32 {
     ((term_lines() - SCREEN_HEIGHT) / 2) as i32
@@ -72,14 +71,18 @@ pub fn left_screen_margin() -> i32 {
     left_screen_edge() + (SCREEN_WIDTH - BORDER_WIDTH) / 2
 }
 
+/// Returns the middle screen (x, y) coordinate
+pub fn screen_middle() -> (i32, i32) {
+    (
+        left_screen_margin() + BORDER_WIDTH / 2,
+        top_screen_margin() + BORDER_HEIGHT / 2,
+    )
+}
+
 pub fn term_lines() -> i32 {
-    unsafe {
-        pancurses::LINES
-    }
+    unsafe { pancurses::LINES }
 }
 
 pub fn term_columns() -> i32 {
-    unsafe {
-        pancurses::COLS
-    }
+    unsafe { pancurses::COLS }
 }

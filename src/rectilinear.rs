@@ -227,7 +227,6 @@ impl RectilinearLine {
         }
 
         // couldn't find any overlapping segments
-        println!("couldn't find any overlapping segments");
         false
     }
 

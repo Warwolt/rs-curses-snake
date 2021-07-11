@@ -2,7 +2,7 @@ use winapi::um::winnt::SHORT;
 use winapi::um::winuser::GetAsyncKeyState;
 use winapi::um::winuser;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum KeyState {
     Released, JustReleased, Pressed, JustPressed
 }
@@ -10,6 +10,7 @@ pub enum KeyState {
 type RawKeyState = SHORT;
 pub type KeyCode = i32;
 
+#[derive(Debug)]
 pub struct KeyboardHandler {
     key_states : Vec<KeyState>,
 }
