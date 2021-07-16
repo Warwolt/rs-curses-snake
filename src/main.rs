@@ -1,3 +1,8 @@
+// TODO:
+// [ ] fix responsiveness in turning snake
+// [ ] add collision with walls
+// [ ] make play area less wide (use 3310 dimensions?)
+
 mod graphics;
 #[macro_use]
 mod rectilinear;
@@ -427,6 +432,8 @@ fn draw_apple(window: &pancurses::Window, apple: IVec2) {
     window.attroff(pancurses::COLOR_PAIR(88)); // red
 }
 
+/// Creates a new apple using `generator`, while avoiding having it overlapping
+/// with the `snake_body`
 fn generate_apple(generator: &mut IVec2Generator, snake_body: &RectilinearLine) -> IVec2 {
     loop {
         let point = generator.gen_ivec2();
