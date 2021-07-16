@@ -10,4 +10,5 @@ glam = "0.14.0" # for 2d vectors
 strum = "0.21.0" # for iterating over enum alues
 strum_macros = "0.21.0" # for iterating over enum alues
 platform = { path = "./platform" }
+rand = "0.8.4" # random number generation
 

@@ -30,6 +30,15 @@ impl Direction {
             Direction::Down => Direction::Up,
         }
     }
+
+    pub fn unit(&self) -> IVec2 {
+        match self {
+            Direction::Right => i32::ivec2(1, 0),
+            Direction::Left => i32::ivec2(-1, 0),
+            Direction::Up => i32::ivec2(0, -1),
+            Direction::Down => i32::ivec2(0, 1),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -69,6 +78,11 @@ pub struct RectilinearLine {
     pub segments: VecDeque<ChainedLineSegment>,
 }
 
+enum Overlap {
+    Corner,
+    Line,
+}
+
 impl RectilinearLine {
     /// Returns the total length of the line, which is 1 for the head plus the
     /// lengths of all the line segments.
@@ -82,21 +96,25 @@ impl RectilinearLine {
     /// If segments are empty, returns `None`.
     pub fn dir(&self) -> Option<Direction> {
         let segments = &self.segments;
-        if segments.len() > 1 {
+        if segments.len() > 0 {
             Some(segments[segments.len() - 1].dir)
         } else {
             None
         }
     }
 
+    /// Return the position of the tip of the line
+    pub fn head(&self) -> IVec2 {
+        let mut pos = self.start;
+        for segment in self.segments.iter().rev() {
+            pos += segment.dir.unit() * segment.len as i32;
+        }
+        pos
+    }
+
     pub fn shrink_tail(&mut self) {
         let tail = &mut self.segments[0];
-        self.start += match tail.dir {
-            Direction::Right => i32::ivec2(1, 0),
-            Direction::Left => i32::ivec2(-1, 0),
-            Direction::Up => i32::ivec2(0, -1),
-            Direction::Down => i32::ivec2(0, 1),
-        };
+        self.start += tail.dir.unit();
 
         if tail.len > 1 {
             tail.len -= 1;
@@ -116,6 +134,12 @@ impl RectilinearLine {
         }
     }
 
+    pub fn extend_tail(&mut self) {
+        let first_seg = &mut self.segments[0];
+        first_seg.len += 1;
+        self.start += first_seg.dir.opposite().unit();
+    }
+
     pub fn move_forward(&mut self, dir: Direction) {
         self.shrink_tail();
         self.extend_head(dir);
@@ -124,47 +148,6 @@ impl RectilinearLine {
     /// Checks if any segment overlaps itself anywhere except in the points
     /// where the line segments join together to make up the line
     pub fn is_self_overlapping(&self) -> bool {
-        enum Overlap {
-            Corner,
-            Line,
-        }
-
-        // Checks if the point x is within the closed range [x0, x1]
-        let intersects = |x: i32, x0: i32, x1: i32| {
-            if [x0, x1].contains(&x) {
-                Some(Overlap::Corner)
-            } else if ((x0 + 1)..x1).contains(&x) {
-                Some(Overlap::Line)
-            } else {
-                None
-            }
-        };
-
-        // checks if two lines overlap
-        let lines_overlap = |(a_x0, a_x1): (i32, i32), (b_x0, b_x1): (i32, i32)| {
-            // can't overlap with self
-            if (a_x0, a_x1) == (b_x0, b_x1) {
-                return false;
-            }
-
-            // let a_x0 = seg_a.pos.x;
-            // let a_x1 = seg_a.pos.x + seg_a.len as i32;
-            // let b_x0 = seg_b.pos.x;
-            // let b_x1 = seg_b.pos.x + seg_b.len as i32;
-
-            /* Check if intersects from first side */
-            if let Some(_) = intersects(b_x0, a_x0, a_x1) {
-                return true;
-            }
-
-            /* Check if intersects from other side */
-            if let Some(_) = intersects(b_x1, a_x0, a_x1) {
-                return true;
-            }
-
-            false
-        };
-
         /* Check vertical segments against horizontal */
         for v_seg in self.vertical_segments() {
             for h_seg in self.horizontal_segments() {
@@ -178,13 +161,13 @@ impl RectilinearLine {
                 let v_y1 = v_seg.pos.y + v_seg.len as i32;
                 let v_x = v_seg.pos.x;
 
-                let overlaps_horizontally = match intersects(v_x, h_x0, h_x1) {
+                let overlaps_horizontally = match point_intersects_line(v_x, h_x0, h_x1) {
                     Some(Overlap::Corner) => ![v_y0, v_y1].contains(&h_y),
                     Some(Overlap::Line) => true,
                     None => false,
                 };
 
-                let overlaps_vertically = match intersects(h_y, v_y0, v_y1) {
+                let overlaps_vertically = match point_intersects_line(h_y, v_y0, v_y1) {
                     Some(Overlap::Corner) => ![h_x0, h_x1].contains(&v_x),
                     Some(Overlap::Line) => true,
                     None => false,
@@ -230,6 +213,31 @@ impl RectilinearLine {
         false
     }
 
+    pub fn collides_with_point(&self, point: IVec2) -> bool {
+        /* Check horizontal collisions */
+        for h_seg in self.horizontal_segments() {
+            if point.y == h_seg.pos.y {
+                match point_intersects_line(point.x, h_seg.pos.x, h_seg.pos.x + h_seg.len as i32) {
+                    Some(_) => return true,
+                    None => continue
+                }
+            }
+        }
+
+        /* Check vertical collisisons */
+        for v_seg in self.vertical_segments() {
+            if point.x == v_seg.pos.x {
+                match point_intersects_line(point.y, v_seg.pos.y, v_seg.pos.y + v_seg.len as i32) {
+                    Some(_) => return true,
+                    None => continue
+                }
+            }
+        }
+
+        // No collisions
+        false
+    }
+
     /// Iterate over each horizontal line segment
     fn horizontal_segments(&self) -> StraightLineSegmentIter {
         StraightLineSegmentIter {
@@ -249,6 +257,37 @@ impl RectilinearLine {
             axis: Axis::Vertical,
         }
     }
+}
+
+/// Checks if the point x is within the closed range [x0, x1]
+fn point_intersects_line(x: i32, x0: i32, x1: i32) -> Option<Overlap> {
+    if [x0, x1].contains(&x) {
+        Some(Overlap::Corner)
+    } else if ((x0 + 1)..x1).contains(&x) {
+        Some(Overlap::Line)
+    } else {
+        None
+    }
+}
+
+/// checks if two lines overlap
+fn lines_overlap((a_x0, a_x1): (i32, i32), (b_x0, b_x1): (i32, i32)) -> bool {
+    // can't overlap with self
+    if (a_x0, a_x1) == (b_x0, b_x1) {
+        return false;
+    }
+
+    /* Check if intersects from first side */
+    if let Some(_) = point_intersects_line(b_x0, a_x0, a_x1) {
+        return true;
+    }
+
+    /* Check if intersects from other side */
+    if let Some(_) = point_intersects_line(b_x1, a_x0, a_x1) {
+        return true;
+    }
+
+    false
 }
 
 /// A line segment that extends out from its position either horizontally to
@@ -318,6 +357,7 @@ mod line_tests {
     use strum::IntoEnumIterator;
 
     /// Creates a straight line with total length `len` in the direction `dir`
+    /// The total legnth is one plus the segment length
     fn straight_line(dir: Direction, len: usize) -> RectilinearLine {
         RectilinearLine {
             start: i32::ivec2(0, 0),
@@ -465,6 +505,42 @@ mod line_tests {
         line.shrink_tail();
         assert_eq!(line.len(), len)
     }
+
+    #[test]
+    fn line_head_can_be_accessed() {
+        //
+        //     ^---->
+        //     |
+        //     |
+        // o--->
+        //
+        let line = RectilinearLine {
+            start: i32::ivec2(0,0),
+            segments: VecDeque::from(vec![
+                seg![Direction::Right, 4],
+                seg![Direction::Up, 3],
+                seg![Direction::Right, 5],
+            ])
+        };
+        assert_eq!(line.head(),  i32::ivec2(9, -3));
+    }
+
+    #[test]
+    fn extending_tail_increases_first_segment_length_and_moves_start_back_by_one() {
+        let len = 5;
+        let mut line = RectilinearLine {
+            start: i32::ivec2(0, 0),
+            segments: VecDeque::from(vec![seg![Direction::Right, len]]),
+        };
+        line.extend_tail();
+        assert_eq!(line.segments[0].len, len + 1);
+        assert_eq!(line.start, i32::ivec2(-1, 0));
+    }
+}
+
+#[cfg(test)]
+mod collision_tests {
+    use super::*;
 
     #[test]
     fn line_without_overlapping_segments_is_not_self_overlapping() {
@@ -638,6 +714,91 @@ mod line_tests {
             segments: VecDeque::from(vec![seg![Direction::Right, 3], seg![Direction::Right, 3]]),
         };
         assert_eq!(h_line.is_self_overlapping(), true);
+    }
+
+    #[test]
+    fn point_not_overlapping_line_segment_not_colliding_with_line() {
+        //
+        //     ^--->
+        //     |
+        //   X |
+        //     |
+        // 0--->
+        //
+        let line = RectilinearLine {
+            start: i32::ivec2(0, 0),
+            segments: VecDeque::from(vec![
+                seg!(Direction::Right, 4),
+                seg!(Direction::Up, 4),
+                seg!(Direction::Right, 4),
+            ]),
+        };
+        let point = i32::ivec2(2, -2);
+        assert_eq!(line.collides_with_point(point), false);
+    }
+
+    #[test]
+    fn point_overlapping_inside_horizontal_segment_collides_with_line() {
+        //
+        //     ^--->
+        //     |
+        //     |
+        //     |
+        // 0-X->
+        //
+        let line = RectilinearLine {
+            start: i32::ivec2(0, 0),
+            segments: VecDeque::from(vec![
+                seg!(Direction::Right, 4),
+                seg!(Direction::Up, 4),
+                seg!(Direction::Right, 4),
+            ]),
+        };
+        let point = i32::ivec2(2, 0);
+        assert_eq!(line.collides_with_point(point), true);
+    }
+
+    #[test]
+    fn point_overlapping_inside_vertical_segment_collides_with_line() {
+        //
+        //     ^--->
+        //     |
+        //     X
+        //     |
+        // 0--->
+        //
+        let line = RectilinearLine {
+            start: i32::ivec2(0, 0),
+            segments: VecDeque::from(vec![
+                seg!(Direction::Right, 4),
+                seg!(Direction::Up, 4),
+                seg!(Direction::Right, 4),
+            ]),
+        };
+        let point = i32::ivec2(4, -2);
+        assert_eq!(line.collides_with_point(point), true);
+    }
+
+
+    #[test]
+    fn point_overlapping_segment_edge_collides_with_line() {
+        //
+        //     ^--->
+        //     |
+        //     |
+        //     |
+        // 0---X
+        //
+        let line = RectilinearLine {
+            start: i32::ivec2(0, 0),
+            segments: VecDeque::from(vec![
+                seg!(Direction::Right, 4),
+                seg!(Direction::Up, 4),
+                seg!(Direction::Right, 4),
+            ]),
+        };
+        let point = i32::ivec2(4, 0);
+        assert_eq!(line.collides_with_point(point), true);
     }
 }
 
