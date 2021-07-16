@@ -66,6 +66,8 @@ struct SnakeState {
     body: RectilinearLine,
     direction: Direction,
     color: u64,
+    movement_frames: usize,
+    turn_cooldown: usize,
 }
 
 #[derive(Debug)]
@@ -104,6 +106,8 @@ impl SnakeState {
             body,
             direction,
             color: 34, // green
+            movement_frames: 0,
+            turn_cooldown: 0,
         }
     }
 
@@ -116,6 +120,8 @@ impl SnakeState {
             },
             color: 34,
             direction: Direction::Right,
+            movement_frames: 0,
+            turn_cooldown: 0,
         }
     }
 }
@@ -140,10 +146,8 @@ fn main() {
     /* Setup initial state */
     let mut prev_time = platform::timing::get_microsec_timestamp();
     let snake = SnakeState::new(RectilinearLine {
-        start: i32::ivec2(graphics::screen_middle().0/ 2, 3),
-        segments: VecDeque::from(vec![
-            seg!(Direction::Down, 3),
-        ]),
+        start: i32::ivec2(graphics::screen_middle().0 / 2, 3),
+        segments: VecDeque::from(vec![seg!(Direction::Down, 3)]),
     });
     let apple = generate_apple(&mut ivec2_gen, &snake.body);
     let mut program_state = ProgramState {
@@ -194,11 +198,10 @@ fn update(mut program_state: ProgramState) -> ProgramState {
     }
 
     /* Run current state */
-    let elapsed_frames = program_state.elapsed_frames;
     let ivec2_gen = &mut program_state.ivec2_gen;
     match program_state.game_state {
         GameState::OngoingRound(round) => {
-            let next_round = run_ongoing_round(round, &keyboard_handler, ivec2_gen, elapsed_frames);
+            let next_round = run_ongoing_round(round, &keyboard_handler, ivec2_gen);
             program_state.game_state = if next_round.game_over {
                 GameState::RoundEnd(RoundEndState {
                     round: next_round,
@@ -289,24 +292,30 @@ fn run_ongoing_round(
     round: RoundState,
     keyboard_handler: &KeyboardHandler,
     ivec2_gen: &mut IVec2Generator,
-    elapsed_frames: usize,
 ) -> RoundState {
-    let mut next_round = RoundState {
-        ..round
-    };
+    let mut next_round = RoundState { ..round };
     let mut snake = &mut next_round.snake;
 
-    // update movement variables
+    // track frames
+    snake.movement_frames += 1;
+    snake.turn_cooldown = snake.turn_cooldown.saturating_sub(1);
+
+    // turn sideways
     if let Some(new_direction) = get_direction(&keyboard_handler) {
-        // only allow turning 90 degrees, not 180
-        if new_direction != snake.direction.opposite() {
+        // make sure we're turning 90 degrees only, and not too often
+        if new_direction != snake.direction.opposite() && snake.turn_cooldown == 0 {
             snake.direction = new_direction;
+            snake.movement_frames = snake.movement_period;
+            // add a delay to when next turn can happen, to prevent from moving
+            // very fast when moving in a diagonal
+            snake.turn_cooldown = snake.movement_period / 2;
         }
     }
 
     // move snake body
-    if elapsed_frames % snake.movement_period == 0 {
+    if snake.movement_frames == snake.movement_period {
         snake.body.move_forward(snake.direction);
+        snake.movement_frames = 0;
     }
 
     // check if overlapped
