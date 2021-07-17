@@ -1,7 +1,8 @@
 // TODO
-// [ ] show final score on game over screen
-// [ ] add round start state that displays "get ready!" a few frames
+// [X] show final score on game over screen
 // [ ] add main menu with difficulty options and logo
+// [ ] add round start state that displays "get ready!" a few frames
+// [ ] add a brief "good bye!" screen on exit
 
 mod graphics;
 #[macro_use]
@@ -78,6 +79,7 @@ struct SnakeState {
 
 #[derive(Debug)]
 struct GameOverState {
+    final_score: usize,
     selection: GameOverSelection,
 }
 
@@ -106,14 +108,16 @@ impl IVec2Generator {
 
 impl SnakeState {
     fn new() -> Self {
+        let body = RectilinearLine {
+            start: i32::ivec2(graphics::screen_middle().0 / 2, 3),
+            segments: VecDeque::from(vec![seg!(Direction::Down, 3)]),
+        };
+        let direction = body.dir().unwrap();
         SnakeState {
             movement_period: 6,
-            body: RectilinearLine {
-                start: i32::ivec2(graphics::screen_middle().0 / 2, 3),
-                segments: VecDeque::from(vec![seg!(Direction::Down, 3)]),
-            },
+            body,
             color: 34,
-            direction: Direction::Right,
+            direction,
             movement_frames: 0,
             turn_cooldown: 0,
         }
@@ -210,6 +214,7 @@ fn update(mut program_state: ProgramState) -> ProgramState {
                 GameState::RoundEnd(next_round)
             } else {
                 GameState::GameOver(GameOverState {
+                    final_score: next_round.round.score,
                     selection: GameOverSelection::Restart,
                 })
             }
@@ -234,11 +239,15 @@ fn update(mut program_state: ProgramState) -> ProgramState {
                             program_state.quit_requested = true;
                             GameState::GameOver(GameOverState {
                                 selection: GameOverSelection::Exit,
+                                ..game_over_state
                             })
                         }
                     }
                 } else {
-                    GameState::GameOver(GameOverState { selection })
+                    GameState::GameOver(GameOverState {
+                        selection,
+                        ..game_over_state
+                    })
                 }
         }
     }
@@ -374,6 +383,9 @@ fn draw_game_over_screen(state: &GameOverState, window: &pancurses::Window) {
     };
 
     let game_over = "Game Over";
+    window.mvprintw(my - 4, mx - game_over.len() as i32 / 2, game_over);
+
+    let game_over = format!("Final Score: {}", state.final_score);
     window.mvprintw(my - 2, mx - game_over.len() as i32 / 2, game_over);
 
     window.attron(attrs.0);
