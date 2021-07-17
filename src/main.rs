@@ -1,17 +1,23 @@
 // TODO
-// [X] show final score on game over screen
-// [ ] add main menu with difficulty options and logo
+// [x] show final score on game over screen
+// [x] add main menu with difficulty options and logo
 // [ ] add round start state that displays "get ready!" a few frames
 // [ ] add a brief "good bye!" screen on exit
+// [ ] add pause menu
+// [ ] generic menu infrastructure (i.e. not hard coded menus)
+// [ ] fix bug where tail can extend into body when eating apples
 
 mod graphics;
 #[macro_use]
 mod rectilinear;
 mod attributes;
+mod menu;
 
+use enum_iterator::IntoEnumIterator;
 use glam::i32;
 use glam::IVec2;
 use graphics::WindowGraphics;
+use menu::ItemList;
 use pancurses;
 use platform;
 use platform::keyboard::KeyboardHandler;
@@ -33,9 +39,50 @@ struct ProgramState {
 
 #[derive(Debug)]
 enum GameState {
+    StartMenu(StartMenuState),
     OngoingRound(RoundState),
     RoundEnd(RoundEndState),
     GameOver(GameOverState),
+}
+
+#[derive(Debug)]
+struct StartMenuState {
+    focused_area: StartMenuArea,
+    menu_items: menu::ItemList<StartMenuItem>,
+    difficulty_items: menu::ItemList<GameDifficulty>,
+    difficulty: GameDifficulty,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum StartMenuArea {
+    Main,
+    Difficulty,
+}
+
+#[derive(Debug, Copy, Clone, IntoEnumIterator)]
+enum StartMenuItem {
+    Start,
+    Difficulty,
+    Exit,
+}
+
+#[derive(Debug, Copy, Clone, IntoEnumIterator)]
+enum GameDifficulty {
+    Easy,
+    Normal,
+    Hard,
+}
+
+#[derive(Debug, PartialEq)]
+enum QuitRequested {
+    Yes,
+    No,
+}
+
+#[derive(Debug, PartialEq)]
+enum ExitMenu {
+    Yes,
+    No,
 }
 
 #[derive(Debug)]
@@ -45,11 +92,17 @@ struct RoundState {
     wall: RectilinearLine,
     score: usize,
     game_over: bool,
+    difficulty: GameDifficulty,
 }
 
 impl RoundState {
-    fn new(generator: &mut IVec2Generator) -> Self {
-        let snake = SnakeState::new();
+    fn new(generator: &mut IVec2Generator, difficulty: GameDifficulty) -> Self {
+        let mut snake = SnakeState::new();
+        snake.movement_period = match difficulty {
+            GameDifficulty::Easy => 8,
+            GameDifficulty::Normal => 6,
+            GameDifficulty::Hard => 4,
+        };
         let apple = generate_apple(generator, &snake.body);
         RoundState {
             snake,
@@ -57,6 +110,7 @@ impl RoundState {
             wall: new_play_area_wall(),
             score: 0,
             game_over: false,
+            difficulty,
         }
     }
 }
@@ -80,6 +134,7 @@ struct SnakeState {
 #[derive(Debug)]
 struct GameOverState {
     final_score: usize,
+    difficulty: GameDifficulty,
     selection: GameOverSelection,
 }
 
@@ -109,7 +164,7 @@ impl IVec2Generator {
 impl SnakeState {
     fn new() -> Self {
         let body = RectilinearLine {
-            start: i32::ivec2(graphics::screen_middle().0 / 2, 3),
+            start: i32::ivec2(graphics::screen_middle().0 / 2, 0),
             segments: VecDeque::from(vec![seg!(Direction::Down, 3)]),
         };
         let direction = body.dir().unwrap();
@@ -135,7 +190,7 @@ fn main() {
         pancurses::init_pair(color, color, pancurses::COLOR_BLACK);
     }
     // random number generation
-    let mut ivec2_gen = IVec2Generator {
+    let ivec2_gen = IVec2Generator {
         rng: rand::thread_rng(),
         x_dist: Uniform::from(1..graphics::BORDER_WIDTH - 3),
         y_dist: Uniform::from(1..graphics::BORDER_HEIGHT - 3),
@@ -143,19 +198,16 @@ fn main() {
 
     /* Setup initial state */
     let mut prev_time = platform::timing::get_microsec_timestamp();
-    let snake = SnakeState::new();
-    let apple = generate_apple(&mut ivec2_gen, &snake.body);
     let mut program_state = ProgramState {
         elapsed_frames: 0,
         quit_requested: false,
         keyboard_handler: KeyboardHandler::new(),
         ivec2_gen,
-        game_state: GameState::OngoingRound(RoundState {
-            snake,
-            apple,
-            wall: new_play_area_wall(),
-            score: 0,
-            game_over: false,
+        game_state: GameState::StartMenu(StartMenuState {
+            focused_area: StartMenuArea::Main,
+            menu_items: ItemList::new(StartMenuItem::into_enum_iter(), 0),
+            difficulty_items: ItemList::new(GameDifficulty::into_enum_iter(), 1),
+            difficulty: GameDifficulty::Normal,
         }),
     };
 
@@ -197,6 +249,25 @@ fn update(mut program_state: ProgramState) -> ProgramState {
     /* Run current state */
     let ivec2_gen = &mut program_state.ivec2_gen;
     match program_state.game_state {
+        GameState::StartMenu(menu_state) => {
+            if menu_state.focused_area == StartMenuArea::Main {
+                let (menu_state, selected_item) = run_start_menu(menu_state, &keyboard_handler);
+                let (game_state, quit) =
+                    transition_start_menu(menu_state, selected_item, ivec2_gen);
+                program_state.game_state = game_state;
+                program_state.quit_requested = quit == QuitRequested::Yes;
+            } else {
+                let (menu_state, exit) = run_difficulty_menu(menu_state, &keyboard_handler);
+                program_state.game_state = GameState::StartMenu(StartMenuState {
+                    focused_area: if exit == ExitMenu::Yes {
+                        StartMenuArea::Main
+                    } else {
+                        StartMenuArea::Difficulty
+                    },
+                    ..menu_state
+                })
+            }
+        }
         GameState::OngoingRound(round) => {
             let next_round = run_ongoing_round(round, &keyboard_handler, ivec2_gen);
             program_state.game_state = if next_round.game_over {
@@ -216,6 +287,7 @@ fn update(mut program_state: ProgramState) -> ProgramState {
                 GameState::GameOver(GameOverState {
                     final_score: next_round.round.score,
                     selection: GameOverSelection::Restart,
+                    difficulty: next_round.round.difficulty,
                 })
             }
         }
@@ -233,7 +305,8 @@ fn update(mut program_state: ProgramState) -> ProgramState {
                     match selection {
                         GameOverSelection::Restart => {
                             let generator = &mut program_state.ivec2_gen;
-                            GameState::OngoingRound(RoundState::new(generator))
+                            let difficulty = game_over_state.difficulty;
+                            GameState::OngoingRound(RoundState::new(generator, difficulty))
                         }
                         GameOverSelection::Exit => {
                             program_state.quit_requested = true;
@@ -263,6 +336,9 @@ fn draw(program_state: &ProgramState, window: &pancurses::Window) {
     pancurses::resize_term(0, 0);
 
     match &program_state.game_state {
+        GameState::StartMenu(menu_state) => {
+            draw_start_menu(&menu_state, &window);
+        }
         GameState::OngoingRound(round_state) => {
             draw_ongoing_round(round_state, &window);
         }
@@ -292,6 +368,79 @@ fn get_direction(keyboard_handler: &KeyboardHandler) -> Option<Direction> {
         None
     }
 }
+
+fn run_start_menu(
+    mut menu_state: StartMenuState,
+    keyboard_handler: &KeyboardHandler,
+) -> (StartMenuState, Option<StartMenuItem>) {
+    if keyboard_handler.key_pressed_now(virtual_keycodes::VK_UP) {
+        menu_state.menu_items.move_back();
+    }
+
+    if keyboard_handler.key_pressed_now(virtual_keycodes::VK_DOWN) {
+        menu_state.menu_items.move_forward();
+    }
+
+    let selected_item = if keyboard_handler.key_pressed_now(virtual_keycodes::VK_RETURN) {
+        Some(menu_state.menu_items.current_item())
+    } else {
+        None
+    };
+
+    (menu_state, selected_item)
+}
+
+fn run_difficulty_menu(
+    mut menu_state: StartMenuState,
+    keyboard_handler: &KeyboardHandler,
+) -> (StartMenuState, ExitMenu) {
+    if keyboard_handler.key_pressed_now(virtual_keycodes::VK_LEFT) {
+        menu_state.difficulty_items.move_back();
+    }
+
+    if keyboard_handler.key_pressed_now(virtual_keycodes::VK_RIGHT) {
+        menu_state.difficulty_items.move_forward();
+    }
+
+    menu_state.difficulty = menu_state.difficulty_items.current_item();
+
+    let menu_return = if keyboard_handler.key_pressed_now(virtual_keycodes::VK_RETURN) {
+        ExitMenu::Yes
+    } else {
+        ExitMenu::No
+    };
+
+    (menu_state, menu_return)
+}
+
+fn transition_start_menu(
+    next_state: StartMenuState,
+    selected_item: Option<StartMenuItem>,
+    ivec2_gen: &mut IVec2Generator,
+) -> (GameState, QuitRequested) {
+    match selected_item {
+        Some(selected_item) => match selected_item {
+            StartMenuItem::Start => {
+                let round_state = RoundState::new(ivec2_gen, next_state.difficulty);
+                (GameState::OngoingRound(round_state), QuitRequested::No)
+            }
+            StartMenuItem::Difficulty => (
+                GameState::StartMenu(StartMenuState {
+                    focused_area: match next_state.focused_area {
+                        StartMenuArea::Main => StartMenuArea::Difficulty,
+                        StartMenuArea::Difficulty => StartMenuArea::Main,
+                    },
+                    ..next_state
+                }),
+                QuitRequested::No,
+            ),
+            StartMenuItem::Exit => (GameState::StartMenu(next_state), QuitRequested::Yes),
+        },
+        None => (GameState::StartMenu(next_state), QuitRequested::No),
+    }
+}
+
+// fn transition
 
 fn run_ongoing_round(
     round: RoundState,
@@ -368,6 +517,88 @@ fn run_round_ending(mut state: RoundEndState) -> RoundEndState {
     state
 }
 
+fn draw_start_menu(menu_state: &StartMenuState, window: &pancurses::Window) {
+    let (mx, my) = graphics::screen_middle();
+    let attributes = {
+        let mut attributes = [attributes::A_NORMAL; 3];
+        if menu_state.focused_area == StartMenuArea::Main {
+            attributes[menu_state.menu_items.current_index()] = attributes::A_REVERSE;
+        }
+        attributes
+    };
+
+    // let game_over = "Rust Snake";
+    window.attron(pancurses::COLOR_PAIR(34));
+    draw_logo(window, mx - 29 / 2 , my - 5);
+    window.attroff(pancurses::COLOR_PAIR(34));
+
+    let start_game = "Start";
+    window.attron(attributes[StartMenuItem::Start as usize]);
+    window.mvprintw(my + 1, mx - start_game.len() as i32 / 2, start_game);
+    window.attroff(attributes[StartMenuItem::Start as usize]);
+
+    let difficulty = "Difficulty:";
+    window.attron(attributes[StartMenuItem::Difficulty as usize]);
+    window.mvprintw(my + 2, mx - 9, difficulty);
+    window.attroff(attributes[StartMenuItem::Difficulty as usize]);
+
+    let difficulty_attr = if menu_state.focused_area == StartMenuArea::Difficulty {
+        attributes::A_REVERSE
+    } else {
+        attributes::A_NORMAL
+    };
+    window.attron(difficulty_attr);
+    window.mvprintw(my + 2, mx + 3, format!("{:?}", menu_state.difficulty));
+    window.attroff(difficulty_attr);
+
+    let exit = "Exit";
+    window.attron(attributes[StartMenuItem::Exit as usize]);
+    window.mvprintw(my + 3, mx - exit.len() as i32 / 2, exit);
+    window.attroff(attributes[StartMenuItem::Exit as usize]);
+}
+
+fn draw_logo(window: &pancurses::Window, x: i32, y: i32) {
+    // █████ █   █ █████ █   █ █████
+    // █     ██  █ █   █ █  █  █
+    // █████ █ █ █ █████ ███   █████
+    //     █ █  ██ █   █ █  █  █
+    // █████ █   █ █   █ █   █ █████
+
+    // S
+    window.draw_horizontal_line(y, x, 5);
+    window.draw_horizontal_line(y + 1, x, 1);
+    window.draw_horizontal_line(y + 2, x, 5);
+    window.draw_horizontal_line(y + 3, x + 4, 1);
+    window.draw_horizontal_line(y + 4, x, 5);
+
+    // N
+    window.draw_vertical_line(y, x + 6, 5);
+    window.draw_vertical_line(y + 1, x + 6 + 1, 1);
+    window.draw_vertical_line(y + 2, x + 6 + 2, 1);
+    window.draw_vertical_line(y + 3, x + 6 + 3, 1);
+    window.draw_vertical_line(y, x + 6 + 4, 5);
+
+    // A
+    window.draw_vertical_line(y, x + 12, 5);
+    window.draw_horizontal_line(y, x + 13, 3);
+    window.draw_horizontal_line(y + 2, x + 13, 3);
+    window.draw_vertical_line(y, x + 16, 5);
+
+    // K
+    window.draw_vertical_line(y, x + 18, 5);
+    window.draw_horizontal_line(y + 2, x + 19, 2);
+    window.draw_horizontal_line(y + 1, x + 21, 1);
+    window.draw_horizontal_line(y + 3, x + 21, 1);
+    window.draw_horizontal_line(y + 0, x + 22, 1);
+    window.draw_horizontal_line(y + 4, x + 22, 1);
+
+    // E
+    window.draw_vertical_line(y, x + 24, 5);
+    window.draw_horizontal_line(y, x + 25, 4);
+    window.draw_horizontal_line(y + 2, x + 25, 4);
+    window.draw_horizontal_line(y + 4, x + 25, 4);
+}
+
 fn draw_ongoing_round(state: &RoundState, window: &pancurses::Window) {
     draw_wall(&window, &state.wall);
     draw_snake(&window, &state.snake);
@@ -386,7 +617,7 @@ fn draw_game_over_screen(state: &GameOverState, window: &pancurses::Window) {
     window.mvprintw(my - 4, mx - game_over.len() as i32 / 2, game_over);
 
     let game_over = format!("Final Score: {}", state.final_score);
-    window.mvprintw(my - 2, mx - game_over.len() as i32 / 2, game_over);
+    window.mvprintw(my - 1, mx - game_over.len() as i32 / 2, game_over);
 
     window.attron(attrs.0);
     window.mvprintw(my + 1, mx - 7, "Restart");

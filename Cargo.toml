@@ -11,4 +11,4 @@ strum = "0.21.0" # for iterating over enum alues
 strum_macros = "0.21.0" # for iterating over enum alues
 platform = { path = "./platform" }
 rand = "0.8.4" # random number generation
-
+enum-iterator = "0.6.0"
