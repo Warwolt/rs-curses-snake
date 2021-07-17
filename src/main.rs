@@ -42,10 +42,12 @@ struct RoundState {
 }
 
 impl RoundState {
-    fn new() -> Self {
+    fn new(generator: &mut IVec2Generator) -> Self {
+        let snake = SnakeState::new();
+        let apple = generate_apple(generator, &snake.body);
         RoundState {
-            snake: SnakeState::new(),
-            apple: i32::ivec2(0, 0),
+            snake,
+            apple,
             wall: new_play_area_wall(),
             score: 0,
             game_over: false,
@@ -219,7 +221,10 @@ fn update(mut program_state: ProgramState) -> ProgramState {
             program_state.game_state =
                 if keyboard_handler.key_pressed_now(virtual_keycodes::VK_RETURN) {
                     match selection {
-                        GameOverSelection::Restart => GameState::OngoingRound(RoundState::new()),
+                        GameOverSelection::Restart => {
+                            let generator = &mut program_state.ivec2_gen;
+                            GameState::OngoingRound(RoundState::new(generator))
+                        }
                         GameOverSelection::Exit => {
                             program_state.quit_requested = true;
                             GameState::GameOver(GameOverState {
