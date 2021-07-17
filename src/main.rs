@@ -1,7 +1,7 @@
 // TODO:
-// [ ] fix responsiveness in turning snake
+// [X] fix responsiveness in turning snake
+// [X] make play area less wide (use 3310 dimensions?)
 // [ ] add collision with walls
-// [ ] make play area less wide (use 3310 dimensions?)
 
 mod graphics;
 #[macro_use]
@@ -147,7 +147,7 @@ fn main() {
     let mut prev_time = platform::timing::get_microsec_timestamp();
     let snake = SnakeState::new(RectilinearLine {
         start: i32::ivec2(graphics::screen_middle().0 / 2, 3),
-        segments: VecDeque::from(vec![seg!(Direction::Down, 3)]),
+        segments: VecDeque::from(vec![seg!(Direction::Down, 10)]),
     });
     let apple = generate_apple(&mut ivec2_gen, &snake.body);
     let mut program_state = ProgramState {
@@ -385,14 +385,14 @@ fn draw_game_over_screen(state: &GameOverState, window: &pancurses::Window) {
     };
 
     let game_over = "Game Over";
-    window.mvprintw(my - 1, mx - game_over.len() as i32 / 2, game_over);
+    window.mvprintw(my - 2, mx - game_over.len() as i32 / 2, game_over);
 
     window.attron(attrs.0);
-    window.mvprintw(my + 2, mx - 7, "Restart");
+    window.mvprintw(my + 1, mx - 6, "Restart");
     window.attroff(attrs.0);
 
     window.attron(attrs.1);
-    window.mvprintw(my + 2, mx + 3, "Exit");
+    window.mvprintw(my + 1, mx + 3, "Exit");
     window.attroff(attrs.1);
 }
 

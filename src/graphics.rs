@@ -52,8 +52,8 @@ impl WindowGraphics for Window {
 // should this maybe be a struct?
 pub const SCREEN_WIDTH: i32 = 84;
 pub const SCREEN_HEIGHT: i32 = 20;
-pub const BORDER_WIDTH: i32 = 80;
-pub const BORDER_HEIGHT: i32 = 16;
+pub const BORDER_HEIGHT: i32 = 12;
+pub const BORDER_WIDTH: i32 = 5 * BORDER_HEIGHT;
 
 pub fn top_screen_edge() -> i32 {
     ((term_lines() - SCREEN_HEIGHT) / 2) as i32
