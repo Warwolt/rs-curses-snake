@@ -1,7 +1,7 @@
 // TODO:
 // [X] fix responsiveness in turning snake
 // [X] make play area less wide (use 3310 dimensions?)
-// [ ] add collision with walls
+// [] add collision with walls
 
 mod graphics;
 #[macro_use]
@@ -40,16 +40,18 @@ enum GameState {
 #[derive(Debug)]
 struct RoundState {
     snake: SnakeState,
-    game_over: bool,
     apple: IVec2, // points
+    wall: RectilinearLine,
+    game_over: bool,
 }
 
 impl RoundState {
     fn new() -> Self {
         RoundState {
-            snake: SnakeState::default(),
-            game_over: false,
+            snake: SnakeState::new(),
             apple: i32::ivec2(0, 0),
+            wall: new_play_area_wall(),
+            game_over: false,
         }
     }
 }
@@ -99,24 +101,12 @@ impl IVec2Generator {
 }
 
 impl SnakeState {
-    fn new(body: RectilinearLine) -> Self {
-        let direction = body.dir().unwrap();
-        SnakeState {
-            movement_period: 6,
-            body,
-            direction,
-            color: 34, // green
-            movement_frames: 0,
-            turn_cooldown: 0,
-        }
-    }
-
-    fn default() -> Self {
+    fn new() -> Self {
         SnakeState {
             movement_period: 6,
             body: RectilinearLine {
-                start: i32::ivec2(0, 0),
-                segments: VecDeque::from(vec![seg!(Direction::Right, 5)]),
+                start: i32::ivec2(graphics::screen_middle().0 / 2, 3),
+                segments: VecDeque::from(vec![seg!(Direction::Down, 3)]),
             },
             color: 34,
             direction: Direction::Right,
@@ -139,16 +129,13 @@ fn main() {
     // random number generation
     let mut ivec2_gen = IVec2Generator {
         rng: rand::thread_rng(),
-        x_dist: Uniform::from(0..graphics::BORDER_WIDTH - 2),
-        y_dist: Uniform::from(0..graphics::BORDER_HEIGHT - 2),
+        x_dist: Uniform::from(1..graphics::BORDER_WIDTH - 3),
+        y_dist: Uniform::from(1..graphics::BORDER_HEIGHT - 3),
     };
 
     /* Setup initial state */
     let mut prev_time = platform::timing::get_microsec_timestamp();
-    let snake = SnakeState::new(RectilinearLine {
-        start: i32::ivec2(graphics::screen_middle().0 / 2, 3),
-        segments: VecDeque::from(vec![seg!(Direction::Down, 10)]),
-    });
+    let snake = SnakeState::new();
     let apple = generate_apple(&mut ivec2_gen, &snake.body);
     let mut program_state = ProgramState {
         elapsed_frames: 0,
@@ -158,6 +145,7 @@ fn main() {
         game_state: GameState::OngoingRound(RoundState {
             snake,
             apple,
+            wall: new_play_area_wall(),
             game_over: false,
         }),
     };
@@ -314,13 +302,21 @@ fn run_ongoing_round(
 
     // move snake body
     if snake.movement_frames == snake.movement_period {
+        // check if about to hit a wall
+        let head_plus_one = snake.body.head() + snake.direction.unit();
+        if next_round.wall.collides_with_point(head_plus_one) {
+            next_round.game_over = true;
+            return next_round;
+        }
+
         snake.body.move_forward(snake.direction);
         snake.movement_frames = 0;
     }
 
-    // check if overlapped
+    // check if collided with self
     if snake.body.is_self_overlapping() {
         next_round.game_over = true;
+        return next_round;
     }
 
     // check if collision with apple
@@ -355,24 +351,7 @@ fn run_round_ending(mut state: RoundEndState) -> RoundEndState {
 }
 
 fn draw_ongoing_round(state: &RoundState, window: &pancurses::Window) {
-    let top_margin = graphics::top_screen_margin();
-    let left_margin = graphics::left_screen_margin();
-
-    // draw window borders
-    window.draw_horizontal_line(top_margin + 0, left_margin + 0, graphics::BORDER_WIDTH);
-    window.draw_vertical_line(top_margin + 1, left_margin + 0, graphics::BORDER_HEIGHT - 1);
-    window.draw_vertical_line(
-        top_margin + 1,
-        left_margin + graphics::BORDER_WIDTH - 1,
-        graphics::BORDER_HEIGHT - 1,
-    );
-    window.draw_horizontal_line(
-        top_margin + graphics::BORDER_HEIGHT - 1,
-        left_margin,
-        graphics::BORDER_WIDTH,
-    );
-
-    // draw actors
+    draw_wall(&window, &state.wall);
     draw_snake(&window, &state.snake);
     draw_apple(&window, state.apple);
 }
@@ -388,7 +367,7 @@ fn draw_game_over_screen(state: &GameOverState, window: &pancurses::Window) {
     window.mvprintw(my - 2, mx - game_over.len() as i32 / 2, game_over);
 
     window.attron(attrs.0);
-    window.mvprintw(my + 1, mx - 6, "Restart");
+    window.mvprintw(my + 1, mx - 7, "Restart");
     window.attroff(attrs.0);
 
     window.attron(attrs.1);
@@ -397,18 +376,26 @@ fn draw_game_over_screen(state: &GameOverState, window: &pancurses::Window) {
 }
 
 fn draw_snake(window: &pancurses::Window, snake: &SnakeState) {
-    window.attron(pancurses::COLOR_PAIR(snake.color));
+    draw_rectilinear_line(window, &snake.body, snake.color);
+}
 
-    let mut x = graphics::left_screen_margin() + 1 + snake.body.start.x;
-    let mut y = graphics::top_screen_margin() + 1 + snake.body.start.y;
+fn draw_wall(window: &pancurses::Window, wall: &RectilinearLine) {
+    draw_rectilinear_line(window, wall, 1);
+}
 
-    if snake.body.len() == 1 {
+fn draw_rectilinear_line(window: &pancurses::Window, line: &RectilinearLine, color: u64) {
+    window.attron(pancurses::COLOR_PAIR(color));
+
+    let mut x = graphics::left_screen_margin() + 1 + line.start.x;
+    let mut y = graphics::top_screen_margin() + 1 + line.start.y;
+
+    if line.len() == 1 {
         window.draw_horizontal_line(y, x, 1);
-        window.attroff(pancurses::COLOR_PAIR(snake.color));
+        window.attroff(pancurses::COLOR_PAIR(color));
         return;
     }
 
-    for segment in &snake.body.segments {
+    for segment in &line.segments {
         let len = segment.len as i32;
         match segment.dir {
             Direction::Up => {
@@ -429,7 +416,7 @@ fn draw_snake(window: &pancurses::Window, snake: &SnakeState) {
             }
         }
     }
-    window.attroff(pancurses::COLOR_PAIR(snake.color));
+    window.attroff(pancurses::COLOR_PAIR(color));
 }
 
 fn draw_apple(window: &pancurses::Window, apple: IVec2) {
@@ -451,5 +438,18 @@ fn generate_apple(generator: &mut IVec2Generator, snake_body: &RectilinearLine) 
         } else {
             break point;
         }
+    }
+}
+
+/// Create the wall that surrounds the play area
+fn new_play_area_wall() -> RectilinearLine {
+    RectilinearLine {
+        start: i32::ivec2(-1, -1), // we surround the play area, so we start at (-1,-1)
+        segments: VecDeque::from(vec![
+            seg!(Direction::Right, graphics::BORDER_WIDTH as usize - 1),
+            seg!(Direction::Down, graphics::BORDER_HEIGHT as usize - 1),
+            seg!(Direction::Left, graphics::BORDER_WIDTH as usize - 1),
+            seg!(Direction::Up, graphics::BORDER_HEIGHT as usize - 2),
+        ]),
     }
 }
