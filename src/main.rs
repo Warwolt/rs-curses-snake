@@ -1,8 +1,3 @@
-// TODO:
-// [X] fix responsiveness in turning snake
-// [X] make play area less wide (use 3310 dimensions?)
-// [] add collision with walls
-
 mod graphics;
 #[macro_use]
 mod rectilinear;
@@ -40,8 +35,9 @@ enum GameState {
 #[derive(Debug)]
 struct RoundState {
     snake: SnakeState,
-    apple: IVec2, // points
+    apple: IVec2,
     wall: RectilinearLine,
+    score: usize,
     game_over: bool,
 }
 
@@ -51,6 +47,7 @@ impl RoundState {
             snake: SnakeState::new(),
             apple: i32::ivec2(0, 0),
             wall: new_play_area_wall(),
+            score: 0,
             game_over: false,
         }
     }
@@ -146,6 +143,7 @@ fn main() {
             snake,
             apple,
             wall: new_play_area_wall(),
+            score: 0,
             game_over: false,
         }),
     };
@@ -323,6 +321,7 @@ fn run_ongoing_round(
     if snake.body.head() == round.apple {
         // eat the apple
         snake.body.extend_tail();
+        next_round.score += 100;
 
         // make new apple
         next_round.apple = generate_apple(ivec2_gen, &snake.body);
@@ -354,6 +353,7 @@ fn draw_ongoing_round(state: &RoundState, window: &pancurses::Window) {
     draw_wall(&window, &state.wall);
     draw_snake(&window, &state.snake);
     draw_apple(&window, state.apple);
+    draw_score(&window, state.score);
 }
 
 fn draw_game_over_screen(state: &GameOverState, window: &pancurses::Window) {
@@ -426,6 +426,12 @@ fn draw_apple(window: &pancurses::Window, apple: IVec2) {
     window.attron(pancurses::COLOR_PAIR(88)); // red
     window.draw_horizontal_line(y, x, 1);
     window.attroff(pancurses::COLOR_PAIR(88)); // red
+}
+
+fn draw_score(window: &pancurses::Window, score: usize) {
+    let top = graphics::top_screen_margin();
+    let left = graphics::left_screen_margin();
+    window.mvprintw(top - 2, left, format!("score: {}", score));
 }
 
 /// Creates a new apple using `generator`, while avoiding having it overlapping

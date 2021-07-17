@@ -94,7 +94,7 @@ impl RectilinearLine {
 
     /// The direction of the line is the direction of the last line segment.
     /// If segments are empty, returns `None`.
-    pub fn dir(&self) -> Option<Direction> {
+    pub fn _dir(&self) -> Option<Direction> {
         let segments = &self.segments;
         if segments.len() > 0 {
             Some(segments[segments.len() - 1].dir)
@@ -389,7 +389,7 @@ mod line_tests {
 
     #[test]
     fn direction_of_empty_line_is_none() {
-        assert_eq!(empty_line().dir(), None);
+        assert_eq!(empty_line()._dir(), None);
     }
 
     #[test]
@@ -400,7 +400,7 @@ mod line_tests {
                 start: i32::ivec2(0, 0),
                 segments: VecDeque::from(vec![seg!(Direction::Left, 2), seg!(dir, 2)]),
             };
-            assert_eq!(line.dir(), Some(dir));
+            assert_eq!(line._dir(), Some(dir));
         }
     }
 
