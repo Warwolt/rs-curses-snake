@@ -1,3 +1,8 @@
+// TODO
+// [ ] show final score on game over screen
+// [ ] add round start state that displays "get ready!" a few frames
+// [ ] add main menu with difficulty options and logo
+
 mod graphics;
 #[macro_use]
 mod rectilinear;
