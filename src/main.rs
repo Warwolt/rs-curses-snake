@@ -1,7 +1,7 @@
 // TODO
 // [x] show final score on game over screen
 // [x] add main menu with difficulty options and logo
-// [ ] add round start state that displays "get ready!" a few frames
+// [x] add round start state that displays "get ready!" a few frames
 // [ ] add a brief "good bye!" screen on exit
 // [ ] add pause menu
 // [ ] generic menu infrastructure (i.e. not hard coded menus)
@@ -44,6 +44,7 @@ enum GameState {
     OngoingRound(RoundState),
     RoundEnd(RoundEndState),
     GameOver(GameOverState),
+    ProgramExit(usize), // frames
 }
 
 #[derive(Debug)]
@@ -259,10 +260,12 @@ fn update(mut program_state: ProgramState) -> ProgramState {
         GameState::StartMenu(menu_state) => {
             if menu_state.focused_area == StartMenuArea::Main {
                 let (menu_state, selected_item) = run_start_menu(menu_state, &keyboard_handler);
-                let (game_state, quit) =
-                    transition_start_menu(menu_state, selected_item);
-                program_state.game_state = game_state;
-                program_state.quit_requested = quit == QuitRequested::Yes;
+                let (game_state, quit) = transition_start_menu(menu_state, selected_item);
+                program_state.game_state = if quit == QuitRequested::Yes {
+                    GameState::ProgramExit(0)
+                } else {
+                    game_state
+                }
             } else {
                 let (menu_state, exit) = run_difficulty_menu(menu_state, &keyboard_handler);
                 program_state.game_state = GameState::StartMenu(StartMenuState {
@@ -326,11 +329,7 @@ fn update(mut program_state: ProgramState) -> ProgramState {
                             GameState::OngoingRound(RoundState::new(generator, difficulty))
                         }
                         GameOverSelection::Exit => {
-                            program_state.quit_requested = true;
-                            GameState::GameOver(GameOverState {
-                                selection: GameOverSelection::Exit,
-                                ..game_over_state
-                            })
+                            GameState::ProgramExit(0)
                         }
                     }
                 } else {
@@ -339,6 +338,13 @@ fn update(mut program_state: ProgramState) -> ProgramState {
                         ..game_over_state
                     })
                 }
+        }
+        GameState::ProgramExit(frames) => {
+            let wait_period = 30; // frames
+            if frames + 1 > wait_period {
+                program_state.quit_requested = true;
+            }
+            program_state.game_state = GameState::ProgramExit(frames + 1);
         }
     }
 
@@ -367,6 +373,9 @@ fn draw(program_state: &ProgramState, window: &pancurses::Window) {
         }
         GameState::GameOver(game_over_state) => {
             draw_game_over_screen(&game_over_state, &window);
+        }
+        GameState::ProgramExit(_) => {
+            draw_program_exit(&window);
         }
     }
 
@@ -439,12 +448,13 @@ fn transition_start_menu(
 ) -> (GameState, QuitRequested) {
     match selected_item {
         Some(selected_item) => match selected_item {
-            StartMenuItem::Start => {
-                (GameState::RoundStart(RoundStartState {
+            StartMenuItem::Start => (
+                GameState::RoundStart(RoundStartState {
                     frames: 0,
                     difficulty: next_state.difficulty,
-                }), QuitRequested::No)
-            }
+                }),
+                QuitRequested::No,
+            ),
             StartMenuItem::Difficulty => (
                 GameState::StartMenu(StartMenuState {
                     focused_area: match next_state.focused_area {
@@ -712,6 +722,12 @@ fn draw_score(window: &pancurses::Window, score: usize) {
     let top = graphics::top_screen_margin();
     let left = graphics::left_screen_margin();
     window.mvprintw(top - 2, left, format!("score: {}", score));
+}
+
+fn draw_program_exit(window: &pancurses::Window) {
+    let (mx, my) = graphics::screen_middle();
+    let good_bye = "Good Bye!";
+    window.mvprintw(my, mx - good_bye.len() as i32 / 2, good_bye);
 }
 
 /// Creates a new apple using `generator`, while avoiding having it overlapping
